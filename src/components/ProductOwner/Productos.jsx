@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import ModalProducto from '../modalproductowner/ModalProducto';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme } from '../../context/ThemeContext';
-import { apiService } from '../../services/apiService';
+import { productOwnerService } from '../../services/productOwnerService';
 import { 
   Package, 
   Plus, 
@@ -42,8 +42,6 @@ const Productos = () => {
     estado: 'activo'
   });
 
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000/api';
-
   const estadoColors = theme === 'dark' ? {
     activo: 'bg-green-900/30 text-green-400 border-green-800',
     inactivo: 'bg-gray-700/30 text-gray-400 border-gray-600',
@@ -57,55 +55,27 @@ const Productos = () => {
   const fetchProductos = async () => {
     try {
       setLoading(true);
+      setError('');
       
-      // Usar la ruta correcta con autenticación
-      const token = await getToken();
-      const response = await fetch(`${API_URL}/products`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setProductos(data.products || data || []);
-        setError('');
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || errorData.message || 'Error al cargar productos');
-      }
+      const data = await productOwnerService.getProducts({}, getToken);
+      setProductos(data.products || data.data || data || []);
     } catch (error) {
-      console.error('Error fetching productos:', error);
+      console.error('Error al cargar productos:', error);
       setError('Error al cargar productos: ' + error.message);
     } finally {
       setLoading(false);
     }
   };
 
-  // Cargar usuarios reales desde la API
+  // Cargar usuarios disponibles para asignación
   const fetchUsuarios = async () => {
     try {
-      const token = await getToken();
-      const response = await fetch(`${API_URL}/users`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setUsuarios(data.users || data || []);
-        setError('');
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || errorData.message || 'Error al cargar usuarios');
-      }
+      const data = await productOwnerService.getUsersForAssignment(getToken);
+      setUsuarios(data.users || data.data || data || []);
     } catch (error) {
+      console.error('Error al cargar usuarios:', error);
       setError('Error al cargar colaboradores: ' + error.message);
       setUsuarios([]);
-      console.error('Error fetching usuarios:', error);
     }
   };
 
@@ -113,35 +83,26 @@ const Productos = () => {
     e.preventDefault();
     
     try {
-      const token = await getToken();
-      const url = editingProduct 
-        ? `${API_URL}/products/${editingProduct._id}`
-        : `${API_URL}/products`;
-      
-      const method = editingProduct ? 'PUT' : 'POST';
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(formData)
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setError(`success:${data.message}`);
-        setShowForm(false);
-        setEditingProduct(null);
-        resetForm();
-        fetchProductos();
+      if (editingProduct) {
+        // Actualizar producto existente
+        const data = await productOwnerService.updateProduct(
+          editingProduct._id,
+          formData,
+          getToken
+        );
+        setError(`success:${data.message || 'Producto actualizado correctamente'}`);
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al guardar producto');
+        // Crear nuevo producto
+        const data = await productOwnerService.createProduct(formData, getToken);
+        setError(`success:${data.message || 'Producto creado correctamente'}`);
       }
+      
+      setShowForm(false);
+      setEditingProduct(null);
+      resetForm();
+      await fetchProductos();
     } catch (error) {
-      console.error('Error en handleSubmit:', error);
+      console.error('Error al guardar producto:', error);
       setError('Error: ' + error.message);
     }
   };
@@ -183,22 +144,9 @@ const Productos = () => {
     }
     
     try {
-      const token = await getToken();
-      const response = await fetch(`${API_URL}/products/${producto._id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        setError('success:Producto eliminado exitosamente');
-        fetchProductos();
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al eliminar producto');
-      }
+      await productOwnerService.deleteProduct(producto._id, getToken);
+      setError('success:Producto eliminado exitosamente');
+      await fetchProductos();
     } catch (error) {
       console.error('Error al eliminar producto:', error);
       setError('Error: ' + error.message);

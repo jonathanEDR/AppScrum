@@ -15,7 +15,7 @@ import {
   BookOpen,
   Clock
 } from 'lucide-react';
-import config from '../../config/config';
+import { scrumMasterService } from '../../services/scrumMasterService';
 import BaseModalScrumMaster, { DateField } from './modalScrumMaster/BaseModalScrumMaster';
 
 const AssignStoryModal = ({ 
@@ -113,37 +113,15 @@ const AssignStoryModal = ({
       setLoading(true);
       setError('');
       
-      const token = await getToken();
-      const params = new URLSearchParams();
-      
-      if (filterPriority) params.append('prioridad', filterPriority);
-      if (filterType) params.append('tipo', filterType);
+      const filters = {};
+      if (filterPriority) filters.prioridad = filterPriority;
+      if (filterType) filters.tipo = filterType;
       
       console.log('Fetching available stories for sprint:', sprint?._id);
-      console.log('API URL:', `${config.API_URL}/sprints/${sprint._id}/available-stories?${params.toString()}`);
       
-      const response = await fetch(
-        `${config.API_URL}/sprints/${sprint._id}/available-stories?${params.toString()}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
-
-      console.log('Response status:', response.status);
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Stories received:', data.stories?.length || 0);
-        console.log('Sample data:', data.stories?.slice(0, 2));
-        setAvailableStories(data.stories || []);
-      } else {
-        const errorData = await response.json();
-        console.error('Error response:', errorData);
-        throw new Error(errorData.error || 'Error al cargar historias disponibles');
-      }
+      const data = await scrumMasterService.getAvailableStories(sprint._id, filters, getToken);
+      console.log('Stories received:', data.stories?.length || 0);
+      setAvailableStories(data.stories || []);
     } catch (error) {
       console.error('Error fetching available stories:', error);
       setError('Error al cargar historias: ' + error.message);
@@ -157,51 +135,31 @@ const AssignStoryModal = ({
 
     try {
       setAssigning(true);
-      const token = await getToken();
       
-      const response = await fetch(
-        `${config.API_URL}/sprints/${sprint._id}/assign-story`,
+      const data = await scrumMasterService.assignStoryToSprint(
+        sprint._id,
         {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            storyId: selectedStory._id,
-            assignedTo: assignedTo || undefined,
-            fechaAsignacion: fechaAsignacion,
-            fechaEstimadaFinalizacion: fechaEstimadaFinalizacion
-          })
-        }
+          storyId: selectedStory._id,
+          assignedTo: assignedTo || undefined,
+          fechaAsignacion: fechaAsignacion,
+          fechaEstimadaFinalizacion: fechaEstimadaFinalizacion
+        },
+        getToken
       );
 
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Remover la historia de la lista de disponibles
-        setAvailableStories(prev => 
-          prev.filter(story => story._id !== selectedStory._id)
-        );
-        
-        // Notificar al componente padre
-        if (onStoryAssigned) {
-          onStoryAssigned(data.story);
-        }
-        
-        // Reset form
-        setSelectedStory(null);
-        setAssignedTo('');
-        
-        // Mostrar éxito brevemente
-        setTimeout(() => {
-          // El modal se cierra automáticamente o se puede mantener abierto
-        }, 1000);
-        
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al asignar historia');
+      // Remover la historia de la lista de disponibles
+      setAvailableStories(prev => 
+        prev.filter(story => story._id !== selectedStory._id)
+      );
+      
+      // Notificar al componente padre
+      if (onStoryAssigned) {
+        onStoryAssigned(data.story);
       }
+      
+      // Reset form
+      setSelectedStory(null);
+      setAssignedTo('');
     } catch (error) {
       console.error('Error assigning story:', error);
       setError('Error al asignar historia: ' + error.message);

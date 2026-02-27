@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme } from '../../context/ThemeContext';
-import config from '../../config/config';
+import { scrumMasterService } from '../../services/scrumMasterService';
 import AssignStoryModal from './AssignStoryModal';
 import SprintStoriesPanel from './SprintStoriesPanel';
 // ✅ OPTIMIZADO: Importar hooks con caché
@@ -163,25 +163,9 @@ const SprintPlanning = () => {
   // TODO: En el futuro, reemplazar con useBacklogItems hook
   const fetchAvailableItems = async (token) => {
     try {
-      // ✅ Simplificado: Solo obtener items pendientes sin filtros
-      // El filtrado por producto/prioridad se hace localmente
-      const params = new URLSearchParams();
-      params.append('estado', 'pendiente');
-      
-      const response = await fetch(`${config.API_URL}/backlog?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        const itemsDisponibles = (data.items || []).filter(item => !item.sprint);
-        setAvailableItems(itemsDisponibles);
-      } else {
-        throw new Error('Error al obtener items del backlog');
-      }
+      const data = await scrumMasterService.getBacklogItems({ estado: 'pendiente' }, getToken);
+      const itemsDisponibles = (data.items || []).filter(item => !item.sprint);
+      setAvailableItems(itemsDisponibles);
     } catch (error) {
       console.error('Error fetching items:', error);
       setError('Error al cargar items del backlog: ' + error.message);
@@ -207,20 +191,8 @@ const SprintPlanning = () => {
   // Cargar items del sprint seleccionado
   const loadSprintItems = async (sprintId) => {
     try {
-      const token = await getToken();
-      const response = await fetch(`${config.API_URL}/backlog?sprint=${sprintId}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setSprintItems(data.items || []);
-      } else {
-        throw new Error('Error al cargar items del sprint');
-      }
+      const data = await scrumMasterService.getBacklogItems({ sprint: sprintId }, getToken);
+      setSprintItems(data.items || []);
     } catch (error) {
       console.error('Error loading sprint items:', error);
       setError('Error al cargar items del sprint: ' + error.message);

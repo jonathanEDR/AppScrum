@@ -141,10 +141,7 @@ const MyTasks = () => {
     setOpenMenuTaskId(null);
 
     try {
-      // Configurar token provider
-      developersApiService.setTokenProvider(getToken);
-      
-      await developersApiService.unassignTask(taskId);
+      await developersApiService.unassignTask(taskId, getToken);
       
       // Recargar lista de tareas
       await refresh();

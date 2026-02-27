@@ -19,7 +19,7 @@ import {
   Settings,
   FileText
 } from 'lucide-react';
-import scrumMasterService from '../../services/scrumMasterService';
+import { scrumMasterService } from '../../services/scrumMasterService';
 import { useAuth, useUser } from '@clerk/clerk-react';
 
 const ScrumMasterBugDetail = ({ bugId, onClose, onUpdate }) => {
@@ -34,10 +34,7 @@ const ScrumMasterBugDetail = ({ bugId, onClose, onUpdate }) => {
   const [submittingComment, setSubmittingComment] = useState(false);
   const [showAssignModal, setShowAssignModal] = useState(false);
 
-  // Configurar token provider
-  useEffect(() => {
-    scrumMasterService.setTokenProvider(getToken);
-  }, [getToken]);
+  // Token provider ya no es necesario - getToken se pasa directamente
 
   // Cargar bug y comentarios
   useEffect(() => {
@@ -49,7 +46,7 @@ const ScrumMasterBugDetail = ({ bugId, onClose, onUpdate }) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await scrumMasterService.getBugReportById(bugId);
+      const response = await scrumMasterService.getBugReportById(bugId, getToken);
       
       if (response.success) {
         setBug(response.data);
@@ -65,7 +62,7 @@ const ScrumMasterBugDetail = ({ bugId, onClose, onUpdate }) => {
 
   const loadComments = async () => {
     try {
-      const response = await scrumMasterService.getBugComments(bugId);
+      const response = await scrumMasterService.getBugComments(bugId, getToken);
       if (response.success) {
         setComments(response.data || []);
       }
@@ -79,7 +76,7 @@ const ScrumMasterBugDetail = ({ bugId, onClose, onUpdate }) => {
 
     try {
       setSubmittingComment(true);
-      const response = await scrumMasterService.addBugComment(bugId, newComment);
+      const response = await scrumMasterService.addBugComment(bugId, newComment, getToken);
       
       if (response.success) {
         setComments(prev => [...prev, response.data]);
@@ -97,19 +94,15 @@ const ScrumMasterBugDetail = ({ bugId, onClose, onUpdate }) => {
 
   const handleStatusChange = async (newStatus) => {
     try {
-      const response = await fetch(`/api/developers/bug-reports/${bugId}`, {
-        method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${await getToken()}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ status: newStatus })
-      });
+      const response = await scrumMasterService.updateBugReport(
+        bugId,
+        { status: newStatus },
+        getToken
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setBug(data.data);
-        onUpdate?.(data.data);
+      if (response.success || response.data) {
+        setBug(response.data || response);
+        onUpdate?.(response.data || response);
       } else {
         throw new Error('Error al cambiar estado');
       }

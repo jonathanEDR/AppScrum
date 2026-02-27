@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme } from '../../context/ThemeContext';
-import config from '../../config/config';
-import { apiService } from '../../services/apiService';
+import { productOwnerService } from '../../services/productOwnerService';
 import { useProducts } from '../../hooks/useProducts';
 import { useSprints } from '../../hooks/useSprints';
 import { 
@@ -20,9 +19,6 @@ import {
   Activity,
   Users
 } from 'lucide-react';
-
-// Base API URL (usar config central)
-const API_BASE_URL = config.API_URL || '';
 
 const Metricas = () => {
   const { getToken } = useAuth();
@@ -54,10 +50,10 @@ const Metricas = () => {
       setLoading(true);
       setError(null);
 
-      // Usar rutas sin autenticación para testing
+      // Usar productOwnerService para obtener métricas
       const [dashboardData, velocityDataRes] = await Promise.all([
-        apiService.get(`/metricas/dashboard/${selectedProduct}?periodo=${periodo}`, getToken),
-        apiService.get(`/metricas/velocity/${selectedProduct}`, getToken)
+        productOwnerService.getDashboardMetrics(selectedProduct, { periodo: `${periodo}d` }, getToken),
+        productOwnerService.getVelocity(selectedProduct, getToken)
       ]);
 
       setMetricas(dashboardData);
@@ -82,7 +78,7 @@ const Metricas = () => {
     }
 
     try {
-      const data = await apiService.get(`/metricas/burndown/${selectedSprint}`, getToken);
+      const data = await productOwnerService.getBurndownData(selectedSprint, getToken);
       setBurndownData(data);
     } catch (error) {
       console.error('Error al cargar burndown:', error);
@@ -95,17 +91,12 @@ const Metricas = () => {
 
   const exportarMetricas = async (formato) => {
     try {
-      // Para exportación de archivos, necesitamos usar fetch directo pero con apiService para headers
-      const token = await getToken();
-      const headers = await apiService.getAuthHeaders(() => Promise.resolve(token));
-      
-      const response = await fetch(`${apiService.baseURL}/metricas/export/${selectedProduct}?formato=${formato}&periodo=${periodo}`, {
-        headers
-      });
+      const blob = await productOwnerService.exportMetrics(
+        selectedProduct, 
+        { formato, periodo: `${periodo}d` }, 
+        getToken
+      );
 
-      if (!response.ok) throw new Error('Error al exportar métricas');
-
-      const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -115,6 +106,7 @@ const Metricas = () => {
       window.URL.revokeObjectURL(url);
       document.body.removeChild(a);
     } catch (error) {
+      console.error('Error al exportar métricas:', error);
       setError(error.message);
     }
   };

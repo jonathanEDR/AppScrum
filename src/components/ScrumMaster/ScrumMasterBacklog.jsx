@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '@clerk/clerk-react';
-import config from '../../config/config';
+import { scrumMasterService } from '../../services/scrumMasterService';
 import ModalBacklogItem from './modalsSM/ModalBacklogItemSM';
 import { useTheme } from '../../context/ThemeContext';
 // ✅ OPTIMIZADO: Importar hooks con caché
@@ -117,29 +117,17 @@ const ScrumMasterBacklog = () => {
 
   const fetchItems = async () => {
     try {
-      const token = await getToken();
-      
       // Solo obtener tareas técnicas (tareas, bugs, mejoras) usando parámetro tipo
       const technicalTypes = ['tarea', 'bug', 'mejora'];
-      const typeFilter = `tipo=${technicalTypes.join(',')}`;
       
       console.log('Fetching Scrum Master technical items...');
       
-      const response = await fetch(`${config.API_URL}/backlog?${typeFilter}&limit=100`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Scrum Master Backlog Items:', data);
-        setItems(data.items || data || []);
-      } else {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Error al cargar items del backlog');
-      }
+      const data = await scrumMasterService.getBacklogItems(
+        { tipo: technicalTypes.join(','), limit: 100 },
+        getToken
+      );
+      console.log('Scrum Master Backlog Items:', data);
+      setItems(data.items || data || []);
     } catch (error) {
       console.error('Error fetching items:', error);
       setError('Error al cargar items del backlog');

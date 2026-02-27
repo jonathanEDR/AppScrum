@@ -19,11 +19,6 @@ const AssignTaskModal = ({ isOpen, onClose, task, onAssignSuccess }) => {
   const [error, setError] = useState('');
   const [confirmation, setConfirmation] = useState(false);
 
-  // Configurar token provider
-  useEffect(() => {
-    developersApiService.setTokenProvider(getToken);
-  }, [getToken]);
-
   useEffect(() => {
     if (isOpen && task) {
       setError('');
@@ -33,7 +28,7 @@ const AssignTaskModal = ({ isOpen, onClose, task, onAssignSuccess }) => {
 
   // Mutation para asignar tarea del backlog
   const assignBacklogMutation = useMutation({
-    mutationFn: (taskId) => developersApiService.assignBacklogTask(taskId),
+    mutationFn: (taskId) => developersApiService.assignBacklogTask(taskId, getToken),
     onSuccess: (data) => {
       // Invalidar queries relacionadas
       queryClient.invalidateQueries(['developer-tasks']);
@@ -54,7 +49,7 @@ const AssignTaskModal = ({ isOpen, onClose, task, onAssignSuccess }) => {
 
   // Mutation para asignar tarea regular
   const assignRegularMutation = useMutation({
-    mutationFn: (taskId) => developersApiService.assignRegularTask(taskId),
+    mutationFn: (taskId) => developersApiService.assignRegularTask(taskId, getToken),
     onSuccess: (data) => {
       // Invalidar queries relacionadas
       queryClient.invalidateQueries(['developer-tasks']);

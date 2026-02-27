@@ -32,12 +32,9 @@ import TimelineWithMilestones from './TimelineWithMilestones';
 import SprintMetrics from './SprintMetrics';
 import BurndownChart from './BurndownChart';
 
-import config from '../../config/config';
-import { apiService } from '../../services/apiService';
+import { productOwnerService } from '../../services/productOwnerService';
 import { useProducts } from '../../hooks/useProducts';
 import { useSprints } from '../../hooks/useSprints';
-
-const API_BASE_URL = config.API_URL || import.meta.env.VITE_API_URL || '';
 
 const Roadmap = () => {
   const { getToken } = useAuth();
@@ -170,17 +167,16 @@ const Roadmap = () => {
       setLoading(true);
       setError(null);
       
-      // 🔥 NUEVO: Incluir tareas en el roadmap
-      const releasesData = await apiService.get(
-        `/releases/roadmap/${selectedProduct}?includeTasks=true`, 
-        getToken
-      );
+      // Incluir tareas en el roadmap
+      const releasesData = await productOwnerService.getReleases({
+        producto: selectedProduct,
+        includeTasks: 'true'
+      }, getToken);
 
-      setReleases(releasesData.releases || []);
+      setReleases(releasesData.releases || releasesData.data || []);
       
-      // 🔥 NUEVO: Guardar las tareas de sprints en estado
+      // Guardar las tareas de sprints en estado
       if (releasesData.sprintTasks) {
-        // Convertir array a objeto para fácil acceso por sprintId
         const tasksMap = releasesData.sprintTasks.reduce((acc, sprintTask) => {
           acc[sprintTask.sprintId] = {
             tasks: sprintTask.tasks,
@@ -189,7 +185,6 @@ const Roadmap = () => {
           return acc;
         }, {});
         
-        // Guardar en sessionStorage para Timeline
         sessionStorage.setItem('roadmap_sprint_tasks', JSON.stringify(tasksMap));
       }
     } catch (error) {
@@ -211,7 +206,6 @@ const Roadmap = () => {
       console.log('Form data received:', formData);
       console.log('Selected product:', selectedProduct);
       
-      // Validar que hay un producto seleccionado
       if (!selectedProduct) {
         throw new Error('Debe seleccionar un producto antes de crear un release');
       }
@@ -219,26 +213,29 @@ const Roadmap = () => {
       const dataToSend = { ...formData, producto: selectedProduct };
       console.log('Data to send:', dataToSend);
       
-      const response = await apiService.post('/releases', dataToSend, getToken);
+      const response = await productOwnerService.createRelease(dataToSend, getToken);
 
-      console.log('Response:', response);
       console.log('Success response:', response);
       
       await cargarReleases();
       setShowReleaseModal(false);
+      addAlert('Release creado exitosamente', 'success');
     } catch (error) {
       console.error('Error creating release:', error);
       setError(error.message);
+      addAlert(error.message || 'Error al crear release', 'error');
     }
   };
 
   const actualizarRelease = async (id, formData) => {
     try {
-      await apiService.put(`/releases/${id}`, formData, getToken);
+      await productOwnerService.updateRelease(id, formData, getToken);
       await cargarReleases();
       setEditingRelease(null);
+      addAlert('Release actualizado exitosamente', 'success');
     } catch (error) {
       setError(error.message);
+      addAlert(error.message || 'Error al actualizar release', 'error');
     }
   };
 
@@ -248,36 +245,20 @@ const Roadmap = () => {
       console.log('Sprint ID:', id);
       console.log('Form data:', formData);
 
-      // Validar release_id si está presente
       if (formData.release_id && !releases.find(r => r._id === formData.release_id)) {
         throw new Error('Release seleccionado no es válido');
       }
 
       const dataToSend = { 
         ...formData,
-        // Asegurar que los campos numéricos sean números
         velocidad_planificada: parseInt(formData.velocidad_planificada) || 0,
         capacidad_equipo: parseInt(formData.capacidad_equipo) || 0,
         progreso: parseInt(formData.progreso) || 0
       };
 
-      const token = await getToken();
-      const response = await fetch(`${API_BASE_URL}/sprints/${id}`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(dataToSend)
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al actualizar sprint');
-      }
-
-      const result = await response.json();
-      console.log('Sprint updated successfully:', result);
+      await productOwnerService.updateSprint(id, dataToSend, getToken);
+      
+      console.log('Sprint updated successfully');
       
       await cargarReleases();
       setEditingSprint(null);
@@ -292,20 +273,12 @@ const Roadmap = () => {
     if (!confirm('¿Está seguro de eliminar este release?')) return;
 
     try {
-      const token = await getToken();
-      const response = await fetch(`${API_BASE_URL}/releases/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al eliminar release');
-      }
-
+      await productOwnerService.deleteRelease(id, getToken);
       await cargarReleases();
+      addAlert('Release eliminado exitosamente', 'success');
     } catch (error) {
       setError(error.message);
+      addAlert(error.message || 'Error al eliminar release', 'error');
     }
   };
 
@@ -313,17 +286,7 @@ const Roadmap = () => {
     if (!confirm('¿Está seguro de eliminar este sprint? Esta acción no se puede deshacer.')) return;
 
     try {
-      const token = await getToken();
-      const response = await fetch(`${API_BASE_URL}/sprints/${id}`, {
-        method: 'DELETE',
-        headers: { 'Authorization': `Bearer ${token}` }
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al eliminar sprint');
-      }
-
+      await productOwnerService.deleteSprint(id, getToken);
       await cargarReleases();
       addAlert('Sprint eliminado exitosamente', 'success');
     } catch (error) {
@@ -381,12 +344,10 @@ const Roadmap = () => {
       console.log('Form data received:', formData);
       console.log('Selected product:', selectedProduct);
       
-      // Validar que hay un producto seleccionado
       if (!selectedProduct) {
         throw new Error('Debe seleccionar un producto antes de crear un sprint');
       }
       
-      // Validar release_id si está presente
       if (formData.release_id && !releases.find(r => r._id === formData.release_id)) {
         throw new Error('Release seleccionado no es válido');
       }
@@ -394,98 +355,63 @@ const Roadmap = () => {
       const dataToSend = { 
         ...formData, 
         producto: selectedProduct,
-        // Asegurar que los campos numéricos sean números
         velocidad_planificada: parseInt(formData.velocidad_planificada) || 0,
         capacidad_equipo: parseInt(formData.capacidad_equipo) || 0,
         progreso: parseInt(formData.progreso) || 0
       };
       console.log('Data to send:', dataToSend);
       
-      const token = await getToken();
-      const response = await fetch(`${API_BASE_URL}/sprints`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(dataToSend)
-      });
-
-      console.log('Response status:', response.status);
-      console.log('Response ok:', response.ok);
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        console.log('Error response:', errorData);
-        throw new Error(errorData.error || 'Error al crear sprint');
-      }
-
-      const result = await response.json();
+      const result = await productOwnerService.createSprint(dataToSend, getToken);
       console.log('Success response:', result);
       
-      // console.log('Reloading data after sprint creation...');
       await cargarReleases();
       setShowSprintModal(false);
+      addAlert('Sprint creado exitosamente', 'success');
       console.log('Sprint creation completed successfully');
     } catch (error) {
       console.error('Error creating sprint:', error);
       setError(error.message);
+      addAlert(error.message || 'Error al crear sprint', 'error');
     }
   };
 
   const cambiarEstadoSprint = async (sprintId, accion) => {
     try {
-      const token = await getToken();
-      const response = await fetch(`${API_BASE_URL}/sprints/${sprintId}/${accion}`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify(accion === 'complete' ? { velocidad_real: 0 } : {})
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || `Error al ${accion} sprint`);
+      const estadoMap = {
+        'activate': 'activo',
+        'complete': 'completado',
+        'cancel': 'cancelado'
+      };
+      
+      const nuevoEstado = estadoMap[accion] || accion;
+      const dataToUpdate = { estado: nuevoEstado };
+      
+      if (accion === 'complete') {
+        dataToUpdate.velocidad_real = 0;
       }
 
+      await productOwnerService.updateSprint(sprintId, dataToUpdate, getToken);
       await cargarReleases();
+      addAlert(`Sprint ${nuevoEstado} exitosamente`, 'success');
     } catch (error) {
       setError(error.message);
+      addAlert(error.message || `Error al cambiar estado del sprint`, 'error');
     }
   };
 
   const cambiarEstadoRelease = async (releaseId, nuevoEstado) => {
     try {
-      const token = await getToken();
-      
       console.log('Cambiando estado:', { releaseId, nuevoEstado });
       
-      const response = await fetch(`${API_BASE_URL}/releases/${releaseId}/estado`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({ 
-          estado: nuevoEstado,
-          notas: `Estado cambiado a ${nuevoEstado} desde Kanban`
-        })
-      });
+      const dataToUpdate = { 
+        estado: nuevoEstado,
+        notas: `Estado cambiado a ${nuevoEstado} desde Kanban`
+      };
 
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al cambiar estado');
-      }
-
-      const data = await response.json();
+      const data = await productOwnerService.updateRelease(releaseId, dataToUpdate, getToken);
       console.log('Estado actualizado:', data);
 
-      // Mostrar alerta de éxito
       addAlert(`Release actualizado a ${nuevoEstado}`, 'success');
-      
-      // Recargar datos para obtener el progreso actualizado
       await cargarReleases();
       
     } catch (error) {

@@ -12,7 +12,8 @@ import {
   Settings,
   Cloud,
   GraduationCap,
-  Bot
+  Bot,
+  UserPlus
 } from 'lucide-react';
 import ThemeToggle from '../ThemeToggle';
 import LogoDisplay from '../LogoDisplay';
@@ -28,6 +29,7 @@ function SuperAdminSidebar({ onLogout, isOpen, onToggle }) {
     { id: 'ai-agents', icon: Bot, label: 'Agentes AI', path: '/super_admin/ai-agents', badge: 'Nuevo' },
     { id: 'scrum-ai', icon: Bot, label: 'SCRUM AI', path: '/super_admin/scrum-ai', badge: 'Beta' },
     { id: 'config', icon: Settings, label: 'Configuración', path: '/super_admin/configuracion' },
+    { id: 'guest-access', icon: UserPlus, label: 'Acceso Invitados', path: '/super_admin/acceso-invitados' },
     { id: 'history', icon: History, label: 'Historial', path: '/super_admin/historial' },
     { id: 'profile', icon: UserCog, label: 'Mi Perfil', path: '/super_admin/perfil' },
   ];

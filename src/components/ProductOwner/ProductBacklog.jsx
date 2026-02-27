@@ -1,8 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme } from '../../context/ThemeContext';
-import config from '../../config/config';
-import { apiService } from '../../services/apiService';
+import { productOwnerService } from '../../services/productOwnerService';
 import { useProducts } from '../../hooks/useProducts';
 import { useUsers } from '../../hooks/useUsers';
 import { useSprints } from '../../hooks/useSprints';
@@ -121,45 +120,30 @@ const ProductBacklog = () => {
   const fetchItems = useCallback(async (page = currentPage) => {
     try {
       setIsFiltering(true);
-      const token = await getToken();
       
-      const params = new URLSearchParams();
-      if (searchTerm) params.append('search', searchTerm);
-      if (filtroProducto) params.append('producto', filtroProducto);
-      if (filtroEstado) params.append('estado', filtroEstado);
-      if (filtroPrioridad) params.append('prioridad', filtroPrioridad);
+      // Preparar filtros
+      const filters = {};
+      if (searchTerm) filters.search = searchTerm;
+      if (filtroProducto) filters.producto = filtroProducto;
+      if (filtroEstado) filters.estado = filtroEstado;
+      if (filtroPrioridad) filters.prioridad = filtroPrioridad;
+      filters.page = page.toString();
+      filters.limit = itemsPerPage.toString();
       
-      // ✅ Agregar parámetros de paginación
-      params.append('page', page.toString());
-      params.append('limit', itemsPerPage.toString());
+      const data = await productOwnerService.getBacklogItems(filters, getToken);
       
-      const url = `${config.API_URL}/backlog?${params.toString()}`;
+      setItems(data.items || data.data || []);
       
-      const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        setItems(data.items || []);
-        
-        // ✅ Actualizar información de paginación
-        if (data.pagination) {
-          setCurrentPage(data.pagination.current_page || 1);
-          setTotalPages(data.pagination.total_pages || 1);
-          setTotalItems(data.pagination.total_items || 0);
-        }
-        
-        setError('');
-      } else {
-        const errorText = await response.text();
-        throw new Error(errorText || 'Error al cargar backlog');
+      // Actualizar información de paginación
+      if (data.pagination) {
+        setCurrentPage(data.pagination.current_page || 1);
+        setTotalPages(data.pagination.total_pages || 1);
+        setTotalItems(data.pagination.total_items || 0);
       }
+      
+      setError('');
     } catch (error) {
-      console.error('Error fetching backlog:', error);
+      console.error('Error al cargar backlog:', error);
       setError('Error al cargar backlog: ' + error.message);
     } finally {
       setLoading(false);
@@ -243,28 +227,17 @@ const ProductBacklog = () => {
     }
     
     try {
-      const token = await getToken();
-      const response = await fetch(`${config.API_URL}/backlog/${item._id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      await productOwnerService.deleteBacklogItem(item._id, getToken);
+      setError('success:Item eliminado exitosamente');
       
-      if (response.ok) {
-        setError('success:Item eliminado exitosamente');
-        // Si era el último item de la página, ir a la página anterior
-        if (items.length === 1 && currentPage > 1) {
-          goToPage(currentPage - 1);
-        } else {
-          fetchItems(currentPage);
-        }
+      // Si era el último item de la página, ir a la página anterior
+      if (items.length === 1 && currentPage > 1) {
+        goToPage(currentPage - 1);
       } else {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'Error al eliminar item');
+        fetchItems(currentPage);
       }
     } catch (error) {
+      console.error('Error al eliminar item:', error);
       setError('Error: ' + error.message);
     }
   };
@@ -296,11 +269,9 @@ const ProductBacklog = () => {
     
     try {
       setLoadingSprints(true);
-      const token = await getToken();
-      const response = await apiService.get(`/api/sprints?producto=${productId}`, token);
-      // ✅ Corregido: La respuesta del backend tiene estructura { sprints: [...], pagination: {...} }
-      setSprints(response.sprints || []);
-      console.log('Sprints cargados para producto:', productId, response.sprints?.length || 0);
+      const data = await productOwnerService.getSprints({ producto: productId }, getToken);
+      setSprints(data.sprints || data.data || []);
+      console.log('Sprints cargados para producto:', productId, (data.sprints || data.data || []).length);
     } catch (error) {
       console.error('Error cargando sprints:', error);
       setSprints([]);

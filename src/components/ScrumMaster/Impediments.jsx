@@ -14,7 +14,7 @@ import {
   Trash2,
   Download
 } from 'lucide-react';
-import apiService from '../../services/apiService';
+import { scrumMasterService } from '../../services/scrumMasterService';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme } from '../../context/ThemeContext';
 
@@ -182,7 +182,7 @@ const Impediments = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiService.getImpediments(getToken);
+      const response = await scrumMasterService.getImpediments({}, getToken);
       const impedimentsList = response.impediments || response || [];
       setImpediments(impedimentsList);
     } catch (error) {
@@ -197,7 +197,7 @@ const Impediments = () => {
   useEffect(() => {
     const fetchTeamMembers = async () => {
       try {
-        const data = await apiService.getTeamMembersWithFallback(getToken);
+        const data = await scrumMasterService.getTeamMembersWithFallback(getToken);
         const names = (data.members || data || []).map(member => {
           if (member.user && member.user.firstName && member.user.lastName) {
             return `${member.user.firstName} ${member.user.lastName}`;
@@ -252,7 +252,7 @@ const Impediments = () => {
   const handleDeleteImpediment = async (id) => {
     if (window.confirm('¿Estás seguro de que quieres eliminar este impedimento?')) {
       try {
-        await apiService.deleteImpediment(id, getToken);
+        await scrumMasterService.deleteImpediment(id, getToken);
         setImpediments(prev => prev.filter(imp => (imp._id || imp.id) !== id));
       } catch (error) {
         console.error('Error deleting impediment:', error);
@@ -263,7 +263,7 @@ const Impediments = () => {
 
   const handleStatusChange = async (id, newStatus) => {
     try {
-      await apiService.updateImpediment(
+      await scrumMasterService.updateImpediment(
         id,
         { 
           status: newStatus,
@@ -291,7 +291,7 @@ const Impediments = () => {
     try {
       if (editingImpediment) {
         // Editar impedimento existente
-        await apiService.updateImpediment(
+        await scrumMasterService.updateImpediment(
           editingImpediment._id || editingImpediment.id,
           formData,
           getToken
@@ -299,7 +299,7 @@ const Impediments = () => {
         await loadImpediments(); // Recargar lista
       } else {
         // Crear nuevo impedimento
-        await apiService.createImpediment(formData, getToken);
+        await scrumMasterService.createImpediment(formData, getToken);
         await loadImpediments(); // Recargar lista
       }
       

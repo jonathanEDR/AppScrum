@@ -14,7 +14,7 @@ import {
   TrendingDown,
   ExternalLink
 } from 'lucide-react';
-import scrumMasterService from '../../services/scrumMasterService';
+import { scrumMasterService } from '../../services/scrumMasterService';
 import ScrumMasterBugDetail from './ScrumMasterBugDetail';
 
 // Componente para las estadísticas de bugs
@@ -204,12 +204,7 @@ const ScrumMasterBugReports = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [limit] = useState(12);
 
-  // Configurar el token provider para el servicio
-  useEffect(() => {
-    if (scrumMasterService && typeof scrumMasterService.setTokenProvider === 'function') {
-      scrumMasterService.setTokenProvider(getToken);
-    }
-  }, [getToken]);
+  // Token provider ya no es necesario - getToken se pasa directamente a cada método
 
   // Cargar datos de bugs
   const loadBugReports = useCallback(async () => {
@@ -230,7 +225,7 @@ const ScrumMasterBugReports = () => {
         }
       });
 
-      const response = await scrumMasterService.getBugReports(queryParams);
+      const response = await scrumMasterService.getBugReports(queryParams, getToken);
 
       if (response.success) {
         setBugs(response.data.bugs || []);

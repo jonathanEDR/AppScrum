@@ -17,17 +17,12 @@ const SprintSelector = ({
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  // Configurar el token provider
-  useEffect(() => {
-    developersApiService.setTokenProvider(getToken);
-  }, [getToken]);
-
   // Cargar sprints disponibles
   useEffect(() => {
     const fetchSprints = async () => {
       setLoading(true);
       try {
-        const response = await developersApiService.getAvailableSprints();
+        const response = await developersApiService.getAvailableSprints(getToken);
         
         if (response.success) {
           setSprints(response.data || []);

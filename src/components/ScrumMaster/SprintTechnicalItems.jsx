@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme } from '../../context/ThemeContext';
+import { scrumMasterService } from '../../services/scrumMasterService';
 import { 
   Target, 
   Bug, 
@@ -235,42 +236,19 @@ const SprintTechnicalItems = ({ sprintData, onRefresh }) => {
     try {
       setLoading(true);
       setError('');
-      
-      const token = await getToken();
-      const API_URL = import.meta.env.VITE_API_URL;
-      
-      // Obtener vista jerárquica del sprint
-      const hierarchicalResponse = await fetch(
-        `${API_URL}/backlog/sprint/${sprintData._id}/hierarchical`,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
 
-      // Obtener productos para filtros
-      const productsResponse = await fetch(`${API_URL}/products`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // Obtener vista jerárquica del sprint y productos en paralelo
+      const [hierarchicalData_resp, productsData] = await Promise.all([
+        scrumMasterService.getSprintHierarchicalItems(sprintData._id, getToken),
+        scrumMasterService.getProducts(getToken).catch(() => ({ products: [] }))
+      ]);
 
-      if (!hierarchicalResponse.ok) {
-        throw new Error('Error al obtener datos jerárquicos del sprint');
-      }
-
-      const hierarchicalData = await hierarchicalResponse.json();
-      const productsData = productsResponse.ok ? await productsResponse.json() : { products: [] };
-      
       // Asegurar que hierarchicalData tenga la estructura correcta
       setHierarchicalData({
-        historias: Array.isArray(hierarchicalData?.historias) ? hierarchicalData.historias : [],
-        items_sin_historia: Array.isArray(hierarchicalData?.items_sin_historia) ? hierarchicalData.items_sin_historia : [],
-        sprint: hierarchicalData?.sprint || null,
-        estadisticas: hierarchicalData?.estadisticas || hierarchicalData?.resumen || {
+        historias: Array.isArray(hierarchicalData_resp?.historias) ? hierarchicalData_resp.historias : [],
+        items_sin_historia: Array.isArray(hierarchicalData_resp?.items_sin_historia) ? hierarchicalData_resp.items_sin_historia : [],
+        sprint: hierarchicalData_resp?.sprint || null,
+        estadisticas: hierarchicalData_resp?.estadisticas || hierarchicalData_resp?.resumen || {
           total_historias: 0,
           total_items_tecnicos: 0,
           items_sin_asignar: 0
@@ -292,28 +270,16 @@ const SprintTechnicalItems = ({ sprintData, onRefresh }) => {
   // Función para cargar usuarios del equipo
   const fetchUsuarios = async () => {
     try {
-      const token = await getToken();
-      const API_URL = import.meta.env.VITE_API_URL;
-      
-      const response = await fetch(`${API_URL}/team/members`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const usuariosFormateados = (data.members || []).map(member => ({
-          _id: member.user?._id || member._id,
-          nombre_negocio: member.user?.nombre_negocio 
-            ? member.user.nombre_negocio 
-            : member.user?.email || 'Usuario',
-          email: member.user?.email || '',
-          role: member.role || 'developer'
-        }));
-        setUsuarios(usuariosFormateados);
-      }
+      const data = await scrumMasterService.getTeamMembers({}, getToken);
+      const usuariosFormateados = (data.members || []).map(member => ({
+        _id: member.user?._id || member._id,
+        nombre_negocio: member.user?.nombre_negocio 
+          ? member.user.nombre_negocio 
+          : member.user?.email || 'Usuario',
+        email: member.user?.email || '',
+        role: member.role || 'developer'
+      }));
+      setUsuarios(usuariosFormateados);
     } catch (error) {
       console.error('Error fetching usuarios:', error);
     }
@@ -322,20 +288,8 @@ const SprintTechnicalItems = ({ sprintData, onRefresh }) => {
   // Función para cargar sprints
   const fetchSprints = async () => {
     try {
-      const token = await getToken();
-      const API_URL = import.meta.env.VITE_API_URL;
-      
-      const response = await fetch(`${API_URL}/sprints`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setSprints(data.sprints || data || []);
-      }
+      const data = await scrumMasterService.getSprints({}, getToken);
+      setSprints(data.sprints || data || []);
     } catch (error) {
       console.error('Error fetching sprints:', error);
     }

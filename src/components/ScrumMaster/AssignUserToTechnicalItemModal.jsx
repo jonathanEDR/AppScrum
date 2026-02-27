@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme } from '../../context/ThemeContext';
+import { scrumMasterService } from '../../services/scrumMasterService';
 import { 
   X, 
   User, 
@@ -39,35 +40,20 @@ const AssignUserToTechnicalItemModal = ({
   const fetchDevelopers = async () => {
     try {
       setFetchingDevelopers(true);
-      const token = await getToken();
-      const API_URL = import.meta.env.VITE_API_URL;
       
-      const response = await fetch(`${API_URL}/team/members`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Filtrar solo developers
-        const devs = (data.members || [])
-          .filter(member => member.role === 'developer' || member.role === 'developers')
-          .map(member => ({
-            _id: member.user._id,
-            nombre_negocio: member.user.nombre_negocio || member.user.email,
-            email: member.user.email,
-            role: member.role
-          }));
-        
-        setDevelopers(devs);
-      } else {
-        const errorData = await response.json();
-        console.error('Error cargando developers:', errorData);
-        setError('Error al cargar la lista de developers');
-      }
+      const data = await scrumMasterService.getTeamMembers({}, getToken);
+      
+      // Filtrar solo developers
+      const devs = (data.members || [])
+        .filter(member => member.role === 'developer' || member.role === 'developers')
+        .map(member => ({
+          _id: member.user._id,
+          nombre_negocio: member.user.nombre_negocio || member.user.email,
+          email: member.user.email,
+          role: member.role
+        }));
+      
+      setDevelopers(devs);
     } catch (error) {
       console.error('Error fetching developers:', error);
       setError('Error al cargar la lista de developers');
@@ -83,28 +69,11 @@ const AssignUserToTechnicalItemModal = ({
       setLoading(true);
       setError('');
 
-      const token = await getToken();
-      const API_URL = import.meta.env.VITE_API_URL;
-
-      const response = await fetch(
-        `${API_URL}/backlog/${technicalItem._id}/assign-user`,
-        {
-          method: 'PUT',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            user_id: selectedUserId || null
-          })
-        }
+      const result = await scrumMasterService.assignUserToItem(
+        technicalItem._id,
+        selectedUserId || null,
+        getToken
       );
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        throw new Error(result.message || 'Error al asignar usuario');
-      }
 
       // Notificar éxito y cerrar modal
       onAssignSuccess(result);

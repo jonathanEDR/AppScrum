@@ -32,11 +32,6 @@ const BugReportDetail = ({ bugId, onClose, onUpdate, onDelete }) => {
   const [editMode, setEditMode] = useState(false);
   const [editData, setEditData] = useState({});
 
-  // Configurar token provider
-  useEffect(() => {
-    developersApiService.setTokenProvider(getToken);
-  }, [getToken]);
-
   // Cargar bug y comentarios
   useEffect(() => {
     loadBugDetail();
@@ -47,7 +42,7 @@ const BugReportDetail = ({ bugId, onClose, onUpdate, onDelete }) => {
     try {
       setLoading(true);
       setError(null);
-      const response = await developersApiService.getBugReportById(bugId);
+      const response = await developersApiService.getBugReportById(bugId, getToken);
       
       if (response.success) {
         setBug(response.data);
@@ -64,7 +59,7 @@ const BugReportDetail = ({ bugId, onClose, onUpdate, onDelete }) => {
 
   const loadComments = async () => {
     try {
-      const response = await developersApiService.getBugComments(bugId);
+      const response = await developersApiService.getBugComments(bugId, 1, 20, getToken);
       if (response.success) {
         setComments(response.data || []);
       }
@@ -78,7 +73,7 @@ const BugReportDetail = ({ bugId, onClose, onUpdate, onDelete }) => {
 
     try {
       setSubmittingComment(true);
-      const response = await developersApiService.addBugComment(bugId, newComment);
+      const response = await developersApiService.addBugComment(bugId, newComment, null, getToken);
       
       if (response.success) {
         setComments(prev => [...prev, response.data]);
@@ -94,7 +89,7 @@ const BugReportDetail = ({ bugId, onClose, onUpdate, onDelete }) => {
 
   const handleStatusChange = async (newStatus) => {
     try {
-      const response = await developersApiService.updateBugStatus(bugId, newStatus);
+      const response = await developersApiService.updateBugStatus(bugId, newStatus, getToken);
       if (response.success) {
         const updatedBug = { ...bug, status: newStatus };
         setBug(updatedBug);
@@ -107,7 +102,7 @@ const BugReportDetail = ({ bugId, onClose, onUpdate, onDelete }) => {
 
   const handleSaveEdit = async () => {
     try {
-      const response = await developersApiService.updateBugReport(bugId, editData);
+      const response = await developersApiService.updateBugReport(bugId, editData, getToken);
       if (response.success) {
         setBug(response.data);
         setEditMode(false);
@@ -122,7 +117,7 @@ const BugReportDetail = ({ bugId, onClose, onUpdate, onDelete }) => {
     if (!confirm('¿Estás seguro de eliminar este bug report?')) return;
 
     try {
-      const response = await developersApiService.deleteBugReport(bugId);
+      const response = await developersApiService.deleteBugReport(bugId, getToken);
       if (response.success) {
         onDelete?.(bugId);
         onClose();

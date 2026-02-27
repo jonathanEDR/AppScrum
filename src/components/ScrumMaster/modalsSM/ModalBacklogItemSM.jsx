@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme } from '../../../context/ThemeContext';
-import config from '../../../config/config';
+import { scrumMasterService } from '../../../services/scrumMasterService';
 import { 
   X, 
   Plus, 
@@ -121,15 +121,6 @@ const ModalBacklogItemSM = ({
       setLoading(true);
       setError('');
       
-      const token = await getToken();
-      
-      // Usar endpoint específico para Scrum Master para nuevos items
-      const url = editingItem 
-        ? `${config.API_URL}/backlog/${editingItem._id}`
-        : `${config.API_URL}/backlog/technical`;
-      
-      const method = editingItem ? 'PUT' : 'POST';
-      
       // Limpiar y preparar datos
       const submitData = {
         ...formData,
@@ -140,32 +131,23 @@ const ModalBacklogItemSM = ({
         etiquetas: formData.etiquetas.filter(tag => tag.trim() !== '')
       };
       
-      console.log('Enviando datos de Scrum Master:', method, url, submitData);
+      console.log('Enviando datos de Scrum Master:', editingItem ? 'PUT' : 'POST', submitData);
       
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(submitData)
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Respuesta exitosa de Scrum Master:', data);
-        
-        // Notificar éxito al componente padre
-        onSuccess(data.message || `Item técnico ${editingItem ? 'actualizado' : 'creado'} exitosamente`);
-        
-        // Cerrar modal y resetear
-        onClose();
-        resetForm();
+      let data;
+      if (editingItem) {
+        data = await scrumMasterService.updateBacklogItem(editingItem._id, submitData, getToken);
       } else {
-        const errorData = await response.text();
-        console.log('Error response:', errorData);
-        throw new Error(errorData || 'Error al guardar item técnico');
+        data = await scrumMasterService.createTechnicalItem(submitData, getToken);
       }
+      
+      console.log('Respuesta exitosa de Scrum Master:', data);
+      
+      // Notificar éxito al componente padre
+      onSuccess(data.message || `Item técnico ${editingItem ? 'actualizado' : 'creado'} exitosamente`);
+      
+      // Cerrar modal y resetear
+      onClose();
+      resetForm();
     } catch (error) {
       console.error('Error en handleSubmit de Scrum Master:', error);
       setError('Error: ' + error.message);

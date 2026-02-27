@@ -81,6 +81,12 @@ const getRoleNavigation = (role) => {
         path: `/super_admin/configuracion`,
         icon: Settings,
         show: true
+      },
+      {
+        name: 'Acceso Invitados',
+        path: `/super_admin/acceso-invitados`,
+        icon: Users,
+        show: true
       }
     ],
     product_owner: [
@@ -174,7 +180,7 @@ const getRoleNavigation = (role) => {
         icon: BarChart3,
         show: true
       }
-    ]
+    ],
   };
 
   return [...baseItems, ...(roleSpecificItems[role] || [])];

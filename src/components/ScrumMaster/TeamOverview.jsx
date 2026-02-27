@@ -1,11 +1,8 @@
 import React, { useState, useEffect, useMemo, useCallback } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme } from '../../context/ThemeContext';
-import sprintService from '../../services/sprintService';
-import { userTasksService } from '../../services/userTasksService';
+import { scrumMasterService } from '../../services/scrumMasterService';
 import UserTasksModal from './UserTasksModal';
-// ✅ OPTIMIZADO: Importar hook con caché
-import { useScrumMasterData } from '../../hooks/useScrumMasterData';
 import { 
   Users, 
   User, 
@@ -285,66 +282,44 @@ const TeamOverview = () => {
   const [showTasksModal, setShowTasksModal] = useState(false);
   const [teamTasksStats, setTeamTasksStats] = useState({});
 
-  const API_URL = import.meta.env.VITE_API_URL;
-
   // Función para cargar colaboradores de la API
   const fetchTeamMembers = async () => {
     try {
       setLoading(true);
       setError('');
-      
-      const token = await getToken();
-      if (!token) {
-        throw new Error('No hay token de autenticación');
-      }
 
-      // Usar el mismo endpoint que funciona en CollaboratorsManagement
-      const response = await fetch(`${API_URL}/team/members`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const data = await scrumMasterService.getTeamMembers({}, getToken);
+        
+      // Procesar datos de TeamMember a formato de usuario
+      // Filtrar solo roles relevantes para Scrum Master: developers y scrum_master
+      const allowedRoles = ['developers', 'scrum_master'];
+      const filteredMembers = (data.teamMembers || data.members || [])
+        .filter(teamMember => allowedRoles.includes(teamMember.role));
       
-      if (response.ok) {
-        const data = await response.json();
-        
-        // Procesar datos de TeamMember a formato de usuario
-        // Filtrar solo roles relevantes para Scrum Master: developers y scrum_master
-        const allowedRoles = ['developers', 'scrum_master'];
-        const filteredMembers = (data.teamMembers || data.members || [])
-          .filter(teamMember => allowedRoles.includes(teamMember.role));
-        
-        const members = filteredMembers.map(teamMember => ({
-          _id: teamMember.user?._id || teamMember._id,
-          user: {
-            firstName: teamMember.user?.firstName || teamMember.user?.nombre_negocio?.split(' ')[0] || 'Usuario',
-            lastName: teamMember.user?.lastName || teamMember.user?.nombre_negocio?.split(' ').slice(1).join(' ') || '',
-            email: teamMember.user?.email || 'usuario@email.com',
-            phone: teamMember.user?.phone || ''
-          },
-          role: teamMember.role || 'user',
-          status: teamMember.status || 'active',
-          team: teamMember.team,
-          position: teamMember.position || 'Miembro del equipo',
-          skills: teamMember.skills || [],
-          availability: teamMember.availability || 100,
-          lastActiveDate: teamMember.lastActiveDate || new Date(),
-          workloadPercentage: teamMember.workloadPercentage || 0,
-          sprintInfo: {
-            currentSprint: teamMember.currentSprint || null,
-            assignedItems: teamMember.assignedItems || 0,
-            completedItems: teamMember.completedItems || 0
-          }
-        }));
-        
-        setTeamMembers(members);
-      } else if (response.status === 404) {
-        // Si no hay miembros, no es un error
-        setTeamMembers([]);
-      } else {
-        throw new Error(`Error ${response.status}: ${response.statusText}`);
-      }
+      const members = filteredMembers.map(teamMember => ({
+        _id: teamMember.user?._id || teamMember._id,
+        user: {
+          firstName: teamMember.user?.firstName || teamMember.user?.nombre_negocio?.split(' ')[0] || 'Usuario',
+          lastName: teamMember.user?.lastName || teamMember.user?.nombre_negocio?.split(' ').slice(1).join(' ') || '',
+          email: teamMember.user?.email || 'usuario@email.com',
+          phone: teamMember.user?.phone || ''
+        },
+        role: teamMember.role || 'user',
+        status: teamMember.status || 'active',
+        team: teamMember.team,
+        position: teamMember.position || 'Miembro del equipo',
+        skills: teamMember.skills || [],
+        availability: teamMember.availability || 100,
+        lastActiveDate: teamMember.lastActiveDate || new Date(),
+        workloadPercentage: teamMember.workloadPercentage || 0,
+        sprintInfo: {
+          currentSprint: teamMember.currentSprint || null,
+          assignedItems: teamMember.assignedItems || 0,
+          completedItems: teamMember.completedItems || 0
+        }
+      }));
+      
+      setTeamMembers(members);
     } catch (error) {
       console.error('Error fetching team members:', error);
       setError('Error al cargar los miembros del equipo: ' + error.message);
@@ -357,14 +332,13 @@ const TeamOverview = () => {
   // Función para cargar estadísticas de tareas del equipo
   const fetchTeamTasksStats = async () => {
     try {
-      const token = await getToken();
-      if (!token) return;
-
-      const result = await userTasksService.getTeamTasksSummary(token);
-      if (result.success) {
+      const result = await scrumMasterService.getTeamTasksSummary(getToken);
+      const summaryData = result.teamTasksSummary || result.data || result || [];
+      
+      if (Array.isArray(summaryData) && summaryData.length > 0) {
         // Convertir array a objeto para acceso rápido por ID de usuario
         const statsMap = {};
-        result.data.forEach(stat => {
+        summaryData.forEach(stat => {
           // Usar tanto email como teamMemberId como claves para acceso flexible
           statsMap[stat.userId] = {
             assignedItems: stat.totalTasks || 0,

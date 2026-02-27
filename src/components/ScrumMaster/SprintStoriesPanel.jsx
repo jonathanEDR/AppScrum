@@ -14,7 +14,7 @@ import {
   AlertTriangle,
   BarChart3
 } from 'lucide-react';
-import config from '../../config/config';
+import { scrumMasterService } from '../../services/scrumMasterService';
 
 const SprintStoriesPanel = ({ 
   sprint, 
@@ -67,31 +67,16 @@ const SprintStoriesPanel = ({
       setRemoving(story._id);
       setError('');
       
-      const token = await getToken();
-      const response = await fetch(
-        `${config.API_URL}/sprints/${sprint._id}/stories/${story._id}`,
-        {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          }
-        }
-      );
+      await scrumMasterService.unassignStoryFromSprint(sprint._id, story._id, getToken);
 
-      if (response.ok) {
-        // Notificar al componente padre
-        if (onStoryRemoved) {
-          onStoryRemoved(story);
-        }
-        
-        // Refrescar la lista
-        if (onRefresh) {
-          onRefresh();
-        }
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al desasignar historia');
+      // Notificar al componente padre
+      if (onStoryRemoved) {
+        onStoryRemoved(story);
+      }
+      
+      // Refrescar la lista
+      if (onRefresh) {
+        onRefresh();
       }
     } catch (error) {
       console.error('Error removing story:', error);

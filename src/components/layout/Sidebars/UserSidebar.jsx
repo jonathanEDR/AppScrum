@@ -17,7 +17,7 @@ function UserSidebar({ currentView, onViewChange, onLogout, userRole, isOpen, on
   const menuItems = [
     { id: 'dashboard', icon: Home, label: 'Dashboard' },
     { id: 'profile', icon: UserCog, label: 'Mi Perfil' },
-    { id: 'actividades', icon: Activity, label: 'Mis Actividades' }
+    { id: 'actividades', icon: Activity, label: 'Mis Actividades' },
   ];
 
   return (

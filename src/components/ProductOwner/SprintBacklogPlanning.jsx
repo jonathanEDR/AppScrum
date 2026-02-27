@@ -18,11 +18,9 @@ import {
   AlertTriangle,
   Info
 } from 'lucide-react';
-import config from '../../config/config';
+import { productOwnerService } from '../../services/productOwnerService';
 import { useProducts } from '../../hooks/useProducts';
 import { useSprints } from '../../hooks/useSprints';
-
-const API_BASE_URL = config.API_URL || import.meta.env.VITE_API_URL || '';
 
 const SprintBacklogPlanning = () => {
   const { getToken } = useAuth();
@@ -76,21 +74,14 @@ const SprintBacklogPlanning = () => {
     }
 
     try {
-      const token = await getToken();
-      const response = await fetch(`${API_BASE_URL}/backlog?producto=${selectedProduct}&estado=pendiente`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const data = await productOwnerService.getBacklogItems(
+        { producto: selectedProduct, estado: 'pendiente' },
+        getToken
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        // Filtrar solo items sin sprint asignado
-        // Mostrar todas las historias pendientes, no solo las "ready"
-        const availableItems = (data.items || []).filter(item => !item.sprint);
-        setAvailableStories(availableItems);
-      }
+      // Filtrar solo items sin sprint asignado
+      const availableItems = (data.items || []).filter(item => !item.sprint);
+      setAvailableStories(availableItems);
     } catch (error) {
       console.error('Error al cargar backlog:', error);
     }
@@ -105,18 +96,8 @@ const SprintBacklogPlanning = () => {
     }
 
     try {
-      const token = await getToken();
-      const response = await fetch(`${API_BASE_URL}/sprints/${selectedSprint._id}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setSprintStories(data.historias || []);
-      }
+      const data = await productOwnerService.getSprint(selectedSprint._id, getToken);
+      setSprintStories(data.historias || []);
     } catch (error) {
       console.error('Error al cargar historias del sprint:', error);
     }
@@ -148,20 +129,12 @@ const SprintBacklogPlanning = () => {
     }
 
     try {
-      const token = await getToken();
-      const response = await fetch(`${API_BASE_URL}/sprints/${selectedSprint._id}/validate-capacity`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ storyIds: pendingStories })
-      });
-
-      if (response.ok) {
-        const validation = await response.json();
-        setCapacityValidation(validation);
-      }
+      const validation = await productOwnerService.validateSprintCapacity(
+        selectedSprint._id,
+        pendingStories,
+        getToken
+      );
+      setCapacityValidation(validation);
     } catch (error) {
       console.error('Error al validar capacidad:', error);
     }
@@ -223,29 +196,19 @@ const SprintBacklogPlanning = () => {
     setSuccess('');
 
     try {
-      const token = await getToken();
-      const response = await fetch(`${API_BASE_URL}/sprints/${selectedSprint._id}/assign-multiple`, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ storyIds: pendingStories })
-      });
+      const data = await productOwnerService.assignMultipleStoriesToSprint(
+        selectedSprint._id,
+        pendingStories,
+        getToken
+      );
 
-      if (response.ok) {
-        const data = await response.json();
-        setSuccess(`✅ ${data.assigned} historia(s) asignadas exitosamente`);
-        setPendingStories([]);
-        setCapacityValidation(null);
-        
-        // Recargar datos
-        await cargarBacklogItems();
-        await cargarSprintStories();
-      } else {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Error al asignar historias');
-      }
+      setSuccess(`✅ ${data.assigned} historia(s) asignadas exitosamente`);
+      setPendingStories([]);
+      setCapacityValidation(null);
+      
+      // Recargar datos
+      await cargarBacklogItems();
+      await cargarSprintStories();
     } catch (error) {
       console.error('Error:', error);
       setError(error.message);

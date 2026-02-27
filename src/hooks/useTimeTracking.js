@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-react';
 import { developersApiService } from '../services/developersApiService';
@@ -16,11 +16,6 @@ export const useTimeTracking = (initialPeriod = 'week') => {
   const { getToken } = useAuth();
   const queryClient = useQueryClient();
   const [period, setPeriod] = useState(initialPeriod);
-  
-  // Configurar el token provider en el servicio
-  useEffect(() => {
-    developersApiService.setTokenProvider(getToken);
-  }, [getToken]);
 
 
   // Query para obtener estadísticas de time tracking
@@ -32,7 +27,7 @@ export const useTimeTracking = (initialPeriod = 'week') => {
   } = useQuery({
     queryKey: ['developer-time-stats', period],
     queryFn: async () => {
-      const response = await developersApiService.getTimeTrackingStats(period);
+      const response = await developersApiService.getTimeTrackingStats(period, getToken);
       if (!response.success) {
         throw new Error('Error al cargar estadísticas');
       }
@@ -50,7 +45,7 @@ export const useTimeTracking = (initialPeriod = 'week') => {
   } = useQuery({
     queryKey: ['developer-time-entries'],
     queryFn: async () => {
-      const response = await developersApiService.getTimeEntries();
+      const response = await developersApiService.getTimeEntries({}, getToken);
       if (!response.success) {
         throw new Error('Error al cargar entradas de tiempo');
       }
@@ -68,7 +63,7 @@ export const useTimeTracking = (initialPeriod = 'week') => {
   } = useQuery({
     queryKey: ['developer-active-timer'],
     queryFn: async () => {
-      const response = await developersApiService.getActiveTimer();
+      const response = await developersApiService.getActiveTimer(getToken);
       if (!response.success) {
         return null;
       }
@@ -102,7 +97,7 @@ export const useTimeTracking = (initialPeriod = 'week') => {
   // Mutation para iniciar timer
   const startTimerMutation = useMutation({
     mutationFn: async (taskId) => {
-      const response = await developersApiService.startTimer(taskId);
+      const response = await developersApiService.startTimer(taskId, getToken);
       if (!response.success) {
         throw new Error('Error al iniciar timer');
       }
@@ -122,7 +117,7 @@ export const useTimeTracking = (initialPeriod = 'week') => {
   // Mutation para detener timer
   const stopTimerMutation = useMutation({
     mutationFn: async (description = '') => {
-      const response = await developersApiService.stopTimer(description);
+      const response = await developersApiService.stopTimer(description, getToken);
       if (!response.success) {
         throw new Error('Error al detener timer');
       }
@@ -143,7 +138,7 @@ export const useTimeTracking = (initialPeriod = 'week') => {
   // Mutation para crear entrada manual
   const createEntryMutation = useMutation({
     mutationFn: async (timeData) => {
-      const response = await developersApiService.createTimeEntry(timeData);
+      const response = await developersApiService.createTimeEntry(timeData, getToken);
       if (!response.success) {
         throw new Error('Error al crear entrada de tiempo');
       }
@@ -159,7 +154,7 @@ export const useTimeTracking = (initialPeriod = 'week') => {
   // Mutation para actualizar entrada
   const updateEntryMutation = useMutation({
     mutationFn: async ({ entryId, updateData }) => {
-      const response = await developersApiService.updateTimeEntry(entryId, updateData);
+      const response = await developersApiService.updateTimeEntry(entryId, updateData, getToken);
       if (!response.success) {
         throw new Error('Error al actualizar entrada de tiempo');
       }
@@ -193,7 +188,7 @@ export const useTimeTracking = (initialPeriod = 'week') => {
   // Mutation para eliminar entrada
   const deleteEntryMutation = useMutation({
     mutationFn: async (entryId) => {
-      const response = await developersApiService.deleteTimeEntry(entryId);
+      const response = await developersApiService.deleteTimeEntry(entryId, getToken);
       if (!response.success) {
         throw new Error('Error al eliminar entrada de tiempo');
       }

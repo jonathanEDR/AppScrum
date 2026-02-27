@@ -63,6 +63,10 @@ const BugReports = lazy(() => import('../components/developers/BugReports.jsx'))
 
 // Componentes de User - lazy loading
 const MyActivities = lazy(() => import('../components/users/MyActivities.jsx'));
+const ProductProgress = lazy(() => import('../components/users/ProductProgress.jsx'));
+
+// Componentes de Admin - lazy loading
+const GuestAccessPanel = lazy(() => import('../components/admin/GuestAccessPanel.jsx'));
 
 
 // Layout wrapper para páginas de autenticación
@@ -187,6 +191,10 @@ export const router = createBrowserRouter([
       {
         path: 'scrum-ai',
         element: <LazyWrapper><ScrumAI /></LazyWrapper>,
+      },
+      {
+        path: 'acceso-invitados',
+        element: <LazyWrapper><GuestAccessPanel /></LazyWrapper>,
       },
     ],
   },
@@ -391,6 +399,10 @@ export const router = createBrowserRouter([
       {
         path: 'actividades',
         element: <LazyWrapper><MyActivities /></LazyWrapper>,
+      },
+      {
+        path: 'proyectos/:productId',
+        element: <LazyWrapper><ProductProgress /></LazyWrapper>,
       },
     ],
   },

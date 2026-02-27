@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme } from '../../../context/ThemeContext';
-import config from '../../../config/config';
+import { productOwnerService } from '../../../services/productOwnerService';
 import { 
   X, 
   Plus, 
@@ -116,13 +116,6 @@ const ModalBacklogItem = ({
       setLoading(true);
       setError('');
       
-      const token = await getToken();
-      const url = editingItem 
-        ? `${config.API_URL}/backlog/${editingItem._id}`
-        : `${config.API_URL}/backlog`;
-      
-      const method = editingItem ? 'PUT' : 'POST';
-      
       // Limpiar y preparar datos
       const submitData = {
         ...formData,
@@ -132,32 +125,27 @@ const ModalBacklogItem = ({
         etiquetas: formData.etiquetas.filter(tag => tag.trim() !== '')
       };
       
-      console.log('Enviando datos:', method, url, submitData);
-      
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify(submitData)
-      });
-      
-      if (response.ok) {
-        const data = await response.json();
-        console.log('Respuesta exitosa:', data);
-        
-        // Notificar éxito al componente padre
-        onSuccess(data.message || `Item ${editingItem ? 'actualizado' : 'creado'} exitosamente`);
-        
-        // Cerrar modal y resetear
-        onClose();
-        resetForm();
+      let data;
+      if (editingItem) {
+        // Actualizar item existente
+        data = await productOwnerService.updateBacklogItem(
+          editingItem._id,
+          submitData,
+          getToken
+        );
       } else {
-        const errorData = await response.text();
-        console.log('Error response:', errorData);
-        throw new Error(errorData || 'Error al guardar item');
+        // Crear nuevo item
+        data = await productOwnerService.createBacklogItem(submitData, getToken);
       }
+      
+      console.log('Respuesta exitosa:', data);
+      
+      // Notificar éxito al componente padre
+      onSuccess(data.message || `Item ${editingItem ? 'actualizado' : 'creado'} exitosamente`);
+      
+      // Cerrar modal y resetear
+      onClose();
+      resetForm();
     } catch (error) {
       console.error('Error en handleSubmit:', error);
       setError('Error: ' + error.message);

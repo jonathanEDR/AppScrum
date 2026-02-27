@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useNavigate } from 'react-router-dom';
-import sprintService from '../../services/sprintService';
+import { scrumMasterService } from '../../services/scrumMasterService';
 import { useScrumMasterData } from '../../hooks/useScrumMasterData';
 import SprintTechnicalItems from './SprintTechnicalItems';
 import { useTheme } from '../../context/ThemeContext';
@@ -537,8 +537,6 @@ const SprintManagement = () => {
     if (!activeSprintData) return;
     
     try {
-      const token = await getToken();
-      
       const actionMap = {
         'start': 'iniciar',
         'pause': 'pausar', 
@@ -547,11 +545,11 @@ const SprintManagement = () => {
       
       const actionData = action === 'end' ? { velocidad_real: metrics?.completedStoryPoints || 0 } : {};
       
-      await sprintService.executeSprintAction(
-        token, 
+      await scrumMasterService.executeSprintAction(
         activeSprintData._id, 
         actionMap[action], 
-        actionData
+        actionData,
+        getToken
       );
 
       // ✅ OPTIMIZADO: Refrescar usando el hook en lugar de fetchSprints

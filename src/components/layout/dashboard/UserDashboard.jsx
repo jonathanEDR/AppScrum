@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@clerk/clerk-react';
 import { useRole } from '../../../context/RoleContext.jsx';
-import { apiService } from '../../../services/apiService';
+import { userService } from '../../../services/userService';
+import ProductCard from '../../../components/users/ProductCard';
 import { 
   Briefcase, 
   FileText, 
@@ -13,25 +14,20 @@ import {
   Target,
   BarChart3,
   Eye,
-  ChevronRight
+  ChevronRight,
+  FolderOpen,
+  RefreshCw
 } from 'lucide-react';
 
 // Tarjeta de estadística para el Panel de Usuario
 const StatCard = ({ title, value, icon: Icon, color = 'blue', trend = null }) => {
-  const colorClasses = {
-    blue: 'bg-blue-500',
-    green: 'bg-green-500',
-    yellow: 'bg-yellow-500',
-    red: 'bg-red-500',
-    purple: 'bg-purple-500'
-  };
-
   const iconBackgroundColors = {
     blue: 'bg-blue-500',
     green: 'bg-green-500', 
     yellow: 'bg-yellow-500',
     red: 'bg-red-500',
-    purple: 'bg-purple-500'
+    purple: 'bg-purple-500',
+    indigo: 'bg-indigo-500'
   };
 
   return (
@@ -53,112 +49,7 @@ const StatCard = ({ title, value, icon: Icon, color = 'blue', trend = null }) =>
   );
 };
 
-// Componente para mostrar proyectos del usuario
-const MyProjects = ({ projects = [], loading = false }) => {
-  const getStatusInfo = (status) => {
-    const statusConfig = {
-      activo: { label: 'Activo', color: 'bg-green-100 text-green-800' },
-      inactivo: { label: 'Planificación', color: 'bg-yellow-100 text-yellow-800' },
-      completado: { label: 'Completado', color: 'bg-blue-100 text-blue-800' },
-      pausado: { label: 'Pausado', color: 'bg-gray-100 text-gray-800' }
-    };
-    return statusConfig[status] || statusConfig.activo;
-  };
-
-  const formatDate = (dateString) => {
-    if (!dateString) return 'Sin fecha';
-    const date = new Date(dateString);
-    return date.toLocaleDateString('es-ES', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric'
-    });
-  };
-
-  if (loading) {
-    return (
-      <div className="bg-white dark:bg-gray-950 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800">
-        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center">
-            <Briefcase className="h-5 w-5 mr-2" />
-            Mis Proyectos
-          </h3>
-        </div>
-        <div className="p-6">
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600 mx-auto"></div>
-            <p className="mt-2 text-gray-500 dark:text-gray-400">Cargando proyectos...</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  return (
-    <div className="bg-white dark:bg-gray-950 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800">
-      <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-        <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 flex items-center">
-          <Briefcase className="h-5 w-5 mr-2" />
-          Mis Proyectos
-        </h3>
-      </div>
-      <div className="p-6">
-        {projects && projects.length > 0 ? (
-          <div className="space-y-4">
-            {projects.map((project) => {
-              const statusInfo = getStatusInfo(project.estado);
-              
-              return (
-                <div key={project._id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-lg transition-shadow bg-gray-50 dark:bg-gray-800">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex-1">
-                      <h4 className="text-base font-semibold text-gray-900 dark:text-gray-100">{project.nombre}</h4>
-                      <p className="text-sm text-gray-500 dark:text-gray-400">{project.equipo || 'Equipo Alpha'}</p>
-                    </div>
-                    <span className={`px-2 py-1 rounded-full text-xs font-medium ${statusInfo.color}`}>
-                      {statusInfo.label}
-                    </span>
-                  </div>
-                  
-                  <div className="mb-3">
-                    <div className="flex justify-between text-sm text-gray-600 dark:text-gray-400 mb-2">
-                      <span>Progreso</span>
-                      <span>{project.progress || 0}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                      <div 
-                        className="bg-indigo-600 dark:bg-indigo-500 h-2 rounded-full transition-all duration-300" 
-                        style={{ width: `${project.progress || 0}%` }}
-                      ></div>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between text-sm">
-                    <span className="flex items-center text-gray-500 dark:text-gray-400">
-                      <Calendar className="h-4 w-4 mr-1" />
-                      Entrega: {formatDate(project.fecha_fin)}
-                    </span>
-                    <button className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-medium flex items-center">
-                      Ver detalles
-                      <ChevronRight className="h-4 w-4 ml-1" />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        ) : (
-          <div className="text-center py-8">
-            <Briefcase className="h-12 w-12 mx-auto text-gray-400 dark:text-gray-600 mb-4" />
-            <p className="text-gray-500 dark:text-gray-400">No tienes proyectos asignados</p>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-// Dashboard específico para User (Panel de Usuario)
+// Dashboard específico para User (Panel de Usuario / Cliente)
 const UserDashboard = () => {
   const navigate = useNavigate();
   const { userId, getToken } = useAuth();
@@ -166,62 +57,24 @@ const UserDashboard = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      if (!userId) return;
+  const fetchDashboardData = async () => {
+    if (!userId) return;
+    
+    try {
+      setLoading(true);
+      setError(null);
       
-      try {
-        setLoading(true);
-        setError(null);
-        
-        const data = await apiService.getUserDashboard(userId, getToken);
-        setDashboardData(data);
-      } catch (error) {
-        console.error('Error fetching dashboard data:', error);
-        setError('Error al cargar los datos del dashboard');
-        
-        // Datos de fallback para desarrollo
-        setDashboardData({
-          user: { nombre_negocio: 'Usuario', email: 'usuario@example.com' },
-          metrics: {
-            totalProjects: 3,
-            pendingTasks: 5,
-            weeklyHours: 32,
-            hoursVariation: 5,
-            isIncrease: true
-          },
-          projects: [
-            {
-              _id: '1',
-              nombre: 'Sistema de Gestión CRM',
-              estado: 'activo',
-              progress: 75,
-              fecha_fin: '2025-08-14',
-              equipo: 'Equipo Alpha'
-            },
-            {
-              _id: '2',
-              nombre: 'App Mobile E-commerce',
-              estado: 'inactivo',
-              progress: 25,
-              fecha_fin: '2025-09-29',
-              equipo: 'Equipo Beta'
-            },
-            {
-              _id: '3',
-              nombre: 'Portal de Reportes',
-              estado: 'completado',
-              progress: 100,
-              fecha_fin: '2025-06-30',
-              equipo: 'Equipo Gamma'
-            }
-          ]
-        });
-      } finally {
-        setLoading(false);
-      }
-    };
+      const data = await userService.getDashboard(userId, getToken);
+      setDashboardData(data);
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+      setError('Error al cargar los datos del dashboard');
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchDashboardData();
   }, [userId, getToken]);
 
@@ -242,9 +95,10 @@ const UserDashboard = () => {
         <h3 className="text-lg font-medium text-red-800 dark:text-red-400 mb-2">Error al cargar datos</h3>
         <p className="text-red-600 dark:text-red-500">{error}</p>
         <button 
-          onClick={() => window.location.reload()} 
-          className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          onClick={fetchDashboardData} 
+          className="mt-4 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 flex items-center gap-2"
         >
+          <RefreshCw className="h-4 w-4" />
           Reintentar
         </button>
       </div>
@@ -253,9 +107,13 @@ const UserDashboard = () => {
 
   const { metrics = {}, projects = [] } = dashboardData || {};
 
+  // Separar proyectos activos y completados
+  const activeProjects = projects.filter(p => p.estado === 'activo' || p.estado === 'inactivo');
+  const completedProjects = projects.filter(p => p.estado === 'completado');
+
   const stats = [
     {
-      title: 'Mis Proyectos',
+      title: 'Proyectos Asignados',
       value: metrics.totalProjects || 0,
       icon: Briefcase,
       color: 'blue'
@@ -267,13 +125,13 @@ const UserDashboard = () => {
       color: 'yellow'
     },
     {
-      title: 'Horas Trabajadas',
+      title: 'Horas Esta Semana',
       value: metrics.weeklyHours || 0,
       icon: Clock,
       color: 'purple',
       trend: metrics.hoursVariation !== undefined ? { 
         positive: metrics.isIncrease, 
-        value: 'Esta semana' 
+        value: `${metrics.isIncrease ? '+' : ''}${metrics.hoursVariation || 0}h vs semana anterior`
       } : null
     }
   ];
@@ -282,13 +140,26 @@ const UserDashboard = () => {
     <div className="space-y-6">
       {/* Header del Panel de Usuario */}
       <div className="bg-gradient-to-r from-indigo-600 to-purple-600 rounded-lg shadow-xl text-white p-8">
-        <h1 className="text-3xl font-bold mb-2">Panel de Usuario</h1>
-        <p className="text-indigo-100 text-lg">
-          Gestiona tus proyectos y mantén al día con tus tareas
-        </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <h1 className="text-3xl font-bold mb-2">
+              Bienvenido{dashboardData?.user?.nombre_negocio ? `, ${dashboardData.user.nombre_negocio}` : ''}
+            </h1>
+            <p className="text-indigo-100 text-lg">
+              Visualiza el avance de tus proyectos asignados
+            </p>
+          </div>
+          <button
+            onClick={fetchDashboardData}
+            className="p-2 bg-white/20 rounded-lg hover:bg-white/30 transition-colors"
+            title="Actualizar datos"
+          >
+            <RefreshCw className="h-5 w-5" />
+          </button>
+        </div>
         {error && (
           <div className="mt-3 bg-yellow-100 text-yellow-800 px-3 py-2 rounded text-sm">
-            ⚠️ Mostrando datos de ejemplo - {error}
+            ⚠️ Algunos datos podrían no estar actualizados
           </div>
         )}
       </div>
@@ -300,43 +171,71 @@ const UserDashboard = () => {
         ))}
       </div>
 
-      {/* Contenido principal */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Mis proyectos - Ocupa 2 columnas en pantallas grandes */}
-        <div className="lg:col-span-2">
-          <MyProjects projects={projects} loading={false} />
+      {/* Proyectos Activos - Grid de tarjetas */}
+      <div>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xl font-bold text-gray-900 dark:text-gray-100 flex items-center gap-2">
+            <FolderOpen className="h-6 w-6 text-indigo-600" />
+            Mis Proyectos
+            {activeProjects.length > 0 && (
+              <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-400 text-sm px-2.5 py-0.5 rounded-full font-medium">
+                {activeProjects.length}
+              </span>
+            )}
+          </h2>
         </div>
 
-        {/* Acciones rápidas */}
-        <div className="bg-white dark:bg-gray-950 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800">
-          <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Acciones Rápidas</h3>
+        {projects.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+            {activeProjects.map((project) => (
+              <ProductCard key={project._id} project={project} />
+            ))}
+            {completedProjects.map((project) => (
+              <ProductCard key={project._id} project={project} />
+            ))}
           </div>
-          <div className="p-6 space-y-4">
-            <button 
-              onClick={() => navigate('/user/proyectos')}
-              className="w-full flex items-center justify-center px-4 py-3 border border-transparent rounded-lg shadow-lg text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-all hover:shadow-xl"
-            >
-              <Eye className="h-5 w-5 mr-2" />
-              Ver Proyectos
-            </button>
-            
-            <button 
-              onClick={() => navigate('/user/calendario')}
-              className="w-full flex items-center justify-center px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg shadow-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all hover:shadow-xl"
-            >
-              <Calendar className="h-5 w-5 mr-2" />
-              Ver Calendario
-            </button>
+        ) : (
+          <div className="bg-white dark:bg-gray-950 rounded-xl shadow-lg border border-gray-200 dark:border-gray-800 p-12 text-center">
+            <Briefcase className="h-16 w-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" />
+            <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+              No tienes proyectos asignados
+            </h3>
+            <p className="text-gray-500 dark:text-gray-400 max-w-md mx-auto">
+              Cuando el administrador te asigne acceso a un proyecto, aparecerá aquí como una tarjeta con su progreso en tiempo real.
+            </p>
+          </div>
+        )}
+      </div>
 
-            <button 
-              onClick={() => navigate('/user/perfil')}
-              className="w-full flex items-center justify-center px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg shadow-lg text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all hover:shadow-xl"
-            >
-              <User className="h-5 w-5 mr-2" />
-              Mi Perfil
-            </button>
-          </div>
+      {/* Acciones rápidas */}
+      <div className="bg-white dark:bg-gray-950 rounded-lg shadow-lg border border-gray-200 dark:border-gray-800">
+        <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+          <h3 className="text-lg font-medium text-gray-900 dark:text-gray-100">Acciones Rápidas</h3>
+        </div>
+        <div className="p-6 grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <button 
+            onClick={() => navigate('/user/actividades')}
+            className="flex items-center justify-center px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg shadow text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all hover:shadow-lg"
+          >
+            <BarChart3 className="h-5 w-5 mr-2" />
+            Mis Actividades
+          </button>
+          
+          <button 
+            onClick={() => navigate('/user/perfil')}
+            className="flex items-center justify-center px-4 py-3 border-2 border-gray-300 dark:border-gray-600 rounded-lg shadow text-sm font-medium text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-800 hover:bg-gray-50 dark:hover:bg-gray-700 transition-all hover:shadow-lg"
+          >
+            <User className="h-5 w-5 mr-2" />
+            Mi Perfil
+          </button>
+
+          <button 
+            onClick={fetchDashboardData}
+            className="flex items-center justify-center px-4 py-3 border border-transparent rounded-lg shadow text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 transition-all hover:shadow-lg"
+          >
+            <RefreshCw className="h-5 w-5 mr-2" />
+            Actualizar Dashboard
+          </button>
         </div>
       </div>
     </div>

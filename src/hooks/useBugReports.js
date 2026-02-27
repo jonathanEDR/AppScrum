@@ -13,11 +13,6 @@ export const useBugReports = (initialFilters = {}) => {
   const [filters, setFilters] = useState(initialFilters);
   const [submitting, setSubmitting] = useState(false);
 
-  // Configurar el token provider en el servicio
-  useEffect(() => {
-    developersApiService.setTokenProvider(getToken);
-  }, [getToken]);
-
   // Función para cargar reportes de bugs
   const loadBugReports = useCallback(async (newFilters = {}) => {
     try {
@@ -25,7 +20,7 @@ export const useBugReports = (initialFilters = {}) => {
       setError(null);
       
       const mergedFilters = { ...filters, ...newFilters };
-      const response = await developersApiService.getBugReports(mergedFilters);
+      const response = await developersApiService.getBugReports(mergedFilters, getToken);
       
       if (response.success) {
         setBugReports(response.data || []);
@@ -46,7 +41,7 @@ export const useBugReports = (initialFilters = {}) => {
       setSubmitting(true);
       setError(null);
       
-      const response = await developersApiService.createBugReport(bugData);
+      const response = await developersApiService.createBugReport(bugData, getToken);
       
       if (response.success) {
         // Agregar el nuevo bug al estado local

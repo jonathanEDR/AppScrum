@@ -1,506 +1,598 @@
+/**
+ * Developer Service
+ * Servicio centralizado para todas las operaciones del Developer
+ * 
+ * @module services/developersApiService
+ * @description
+ * Este servicio encapsula TODAS las llamadas API del módulo Developer:
+ * - Dashboard del developer
+ * - Gestión de tareas (CRUD, asignación, des-asignación)
+ * - Sprint Board
+ * - Time Tracking (entradas, timer)
+ * - Bug Reports (CRUD, comentarios, attachments)
+ * - Proyectos y backlog disponible
+ * 
+ * ✅ Utiliza apiService para:
+ *    - Deduplicación de peticiones
+ *    - Caché automático (30s)
+ *    - Manejo centralizado de tokens (Clerk)
+ *    - Headers de autenticación
+ * 
+ * ✅ Patrón consistente con productOwnerService y scrumMasterService:
+ *    - getToken se pasa como parámetro en cada método
+ *    - apiService maneja la resolución del token internamente
+ */
+
 import { apiService } from './apiService';
 
-/**
- * Servicio API para el módulo de Developers
- * Maneja todas las comunicaciones con el backend para funcionalidades de desarrolladores
- */
 class DevelopersApiService {
   constructor() {
-    this.baseURL = '/developers';
+    // Paths base para cada módulo del Developer
+    this.paths = {
+      developers: '/developers',
+      products: '/products',
+      backlog: '/backlog'
+    };
   }
 
-  // Método privado para obtener el token de la forma correcta
-  _getTokenFromContext() {
-    // Este método será sobrescrito en tiempo de ejecución por el contexto
-    throw new Error('Token context not initialized. Use setTokenProvider() first.');
-  }
-
-  // Método para establecer el proveedor de token (llamado desde el hook)
-  setTokenProvider(getTokenFn) {
-    // Aceptar un proveedor de token (función) o un token/promise directo y envolverlo
-    if (typeof getTokenFn === 'function') {
-      this._getTokenFromContext = getTokenFn;
-      return;
-    }
-
-    if (getTokenFn && (typeof getTokenFn === 'string' || typeof getTokenFn.then === 'function')) {
-      // Si recibimos un token (string) o una promesa, envolver en una función que lo devuelva
-      this._getTokenFromContext = () => Promise.resolve(getTokenFn);
-      console.warn('developersApiService: setTokenProvider received a token/promise instead of a function — wrapping it.');
-      return;
-    }
-
-    // Caso por defecto: no válido
-    console.warn('developersApiService: setTokenProvider called with invalid value, token requests will be unauthenticated.', getTokenFn);
-    this._getTokenFromContext = async () => undefined;
-  }
+  // ============================================
+  // DASHBOARD
+  // ============================================
 
   /**
-   * Dashboard - Obtiene métricas del dashboard del developer
+   * Obtiene métricas del dashboard del developer
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async getDashboardData() {
+  async getDashboardData(getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.get(`${this.baseURL}/dashboard`, token);
-      return response;
+      return await apiService.get(`${this.paths.developers}/dashboard`, getToken);
     } catch (error) {
-      console.error('Error al obtener datos del dashboard:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.getDashboardData error:', error);
+      throw error;
     }
   }
 
+  // ============================================
+  // TAREAS
+  // ============================================
+
   /**
-   * Tareas - Obtiene tareas del developer con filtros
+   * Obtiene tareas del developer con filtros
+   * @param {Object} filters - Filtros opcionales
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async getTasks(filters = {}) {
+  async getTasks(filters = {}, getToken) {
     try {
-      const token = await this._getTokenFromContext();
       const params = new URLSearchParams();
-      
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
           params.append(key, value);
         }
       });
-
       const queryString = params.toString();
-      const url = queryString ? `${this.baseURL}/tasks?${queryString}` : `${this.baseURL}/tasks`;
-      
-      const response = await apiService.get(url, token);
-      return response;
+      const endpoint = queryString 
+        ? `${this.paths.developers}/tasks?${queryString}` 
+        : `${this.paths.developers}/tasks`;
+      return await apiService.get(endpoint, getToken);
     } catch (error) {
-      console.error('Error al obtener tareas:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.getTasks error:', error);
+      throw error;
     }
   }
 
   /**
    * Actualiza el estado de una tarea
+   * @param {string} taskId - ID de la tarea
+   * @param {string} status - Nuevo estado
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async updateTaskStatus(taskId, status) {
+  async updateTaskStatus(taskId, status, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.put(`${this.baseURL}/tasks/${taskId}/status`, {
-        status
-      }, token);
-      return response;
+      return await apiService.put(
+        `${this.paths.developers}/tasks/${taskId}/status`,
+        { status },
+        getToken
+      );
     } catch (error) {
-      console.error('Error al actualizar estado de tarea:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.updateTaskStatus error:', error);
+      throw error;
     }
   }
 
   /**
    * Des-asigna una tarea (la devuelve al backlog)
+   * @param {string} taskId - ID de la tarea
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async unassignTask(taskId) {
+  async unassignTask(taskId, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.delete(`${this.baseURL}/tasks/${taskId}/unassign`, token);
-      return response;
+      return await apiService.delete(`${this.paths.developers}/tasks/${taskId}/unassign`, getToken);
     } catch (error) {
-      console.error('Error al des-asignar tarea:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.unassignTask error:', error);
+      throw error;
     }
   }
 
+  // ============================================
+  // SPRINT BOARD
+  // ============================================
+
   /**
-   * Sprint Board - Obtiene datos del sprint board con filtros
+   * Obtiene datos del sprint board con filtros
+   * @param {string|null} sprintId - ID del sprint (null para todos)
+   * @param {string} filterMode - Modo de filtro ('all' o 'sprint')
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async getSprintBoardData(sprintId = null, filterMode = 'all') {
+  async getSprintBoardData(sprintId = null, filterMode = 'all', getToken) {
     try {
-      const token = await this._getTokenFromContext();
       const params = new URLSearchParams();
-      
-      if (sprintId) {
-        params.append('sprintId', sprintId);
-      }
-      
-      if (filterMode) {
-        params.append('filterMode', filterMode);
-      }
-      
+      if (sprintId) params.append('sprintId', sprintId);
+      if (filterMode) params.append('filterMode', filterMode);
       const queryString = params.toString();
-      const url = `${this.baseURL}/sprint-board${queryString ? '?' + queryString : ''}`;
-      
-      const response = await apiService.get(url, token);
-      return response;
+      const endpoint = `${this.paths.developers}/sprint-board${queryString ? '?' + queryString : ''}`;
+      return await apiService.get(endpoint, getToken);
     } catch (error) {
-      console.error('Error al obtener datos del sprint board:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.getSprintBoardData error:', error);
+      throw error;
     }
   }
 
+  // ============================================
+  // SPRINTS
+  // ============================================
+
   /**
-   * Sprints - Obtiene lista de sprints disponibles
+   * Obtiene lista de sprints disponibles
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async getAvailableSprints() {
+  async getAvailableSprints(getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.get(`${this.baseURL}/sprints`, token);
-      return response;
+      return await apiService.get(`${this.paths.developers}/sprints`, getToken);
     } catch (error) {
-      console.error('Error al obtener sprints disponibles:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.getAvailableSprints error:', error);
+      throw error;
     }
   }
 
+  // ============================================
+  // TIME TRACKING
+  // ============================================
+
   /**
-   * Time Tracking - Obtiene estadísticas de tiempo
+   * Obtiene estadísticas de tiempo
+   * @param {string} period - Período ('week', 'month', etc.)
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async getTimeTrackingStats(period = 'week') {
+  async getTimeTrackingStats(period = 'week', getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.get(`${this.baseURL}/time-tracking/stats?period=${period}`, token);
-      return response;
+      return await apiService.get(
+        `${this.paths.developers}/time-tracking/stats?period=${period}`,
+        getToken
+      );
     } catch (error) {
-      console.error('Error al obtener estadísticas de time tracking:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.getTimeTrackingStats error:', error);
+      throw error;
     }
   }
 
   /**
    * Obtiene entradas de time tracking
+   * @param {Object} filters - Filtros opcionales
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async getTimeEntries(filters = {}) {
+  async getTimeEntries(filters = {}, getToken) {
     try {
-      const token = await this._getTokenFromContext();
       const params = new URLSearchParams();
-      
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
           params.append(key, value);
         }
       });
-
       const queryString = params.toString();
-      const url = queryString ? `${this.baseURL}/time-tracking?${queryString}` : `${this.baseURL}/time-tracking`;
-      
-      const response = await apiService.get(url, token);
-      return response;
+      const endpoint = queryString 
+        ? `${this.paths.developers}/time-tracking?${queryString}` 
+        : `${this.paths.developers}/time-tracking`;
+      return await apiService.get(endpoint, getToken);
     } catch (error) {
-      console.error('Error al obtener entradas de tiempo:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.getTimeEntries error:', error);
+      throw error;
     }
   }
 
   /**
    * Crea una nueva entrada de time tracking
+   * @param {Object} timeData - Datos de la entrada de tiempo
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async createTimeEntry(timeData) {
+  async createTimeEntry(timeData, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.post(`${this.baseURL}/time-tracking`, timeData, token);
-      return response;
+      return await apiService.post(`${this.paths.developers}/time-tracking`, timeData, getToken);
     } catch (error) {
-      console.error('Error al crear entrada de tiempo:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.createTimeEntry error:', error);
+      throw error;
     }
   }
 
   /**
    * Actualiza una entrada de time tracking
+   * @param {string} entryId - ID de la entrada
+   * @param {Object} updateData - Datos a actualizar
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async updateTimeEntry(entryId, updateData) {
+  async updateTimeEntry(entryId, updateData, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.put(`${this.baseURL}/time-tracking/${entryId}`, updateData, token);
-      return response;
+      return await apiService.put(
+        `${this.paths.developers}/time-tracking/${entryId}`,
+        updateData,
+        getToken
+      );
     } catch (error) {
-      console.error('Error al actualizar entrada de tiempo:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.updateTimeEntry error:', error);
+      throw error;
     }
   }
 
   /**
    * Elimina una entrada de time tracking
+   * @param {string} entryId - ID de la entrada
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async deleteTimeEntry(entryId) {
+  async deleteTimeEntry(entryId, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.delete(`${this.baseURL}/time-tracking/${entryId}`, token);
-      return response;
+      return await apiService.delete(`${this.paths.developers}/time-tracking/${entryId}`, getToken);
     } catch (error) {
-      console.error('Error al eliminar entrada de tiempo:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.deleteTimeEntry error:', error);
+      throw error;
     }
   }
 
+  // ============================================
+  // TIMER
+  // ============================================
+
   /**
-   * Timer - Inicia un timer para una tarea
+   * Inicia un timer para una tarea
+   * @param {string} taskId - ID de la tarea
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async startTimer(taskId) {
+  async startTimer(taskId, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.post(`${this.baseURL}/timer/start`, { taskId }, token);
-      return response;
+      return await apiService.post(`${this.paths.developers}/timer/start`, { taskId }, getToken);
     } catch (error) {
-      console.error('Error al iniciar timer:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.startTimer error:', error);
+      throw error;
     }
   }
 
   /**
    * Detiene el timer activo
+   * @param {string} description - Descripción del trabajo realizado
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async stopTimer(description = '') {
+  async stopTimer(description = '', getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.post(`${this.baseURL}/timer/stop`, { description }, token);
-      return response;
+      return await apiService.post(`${this.paths.developers}/timer/stop`, { description }, getToken);
     } catch (error) {
-      console.error('Error al detener timer:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.stopTimer error:', error);
+      throw error;
     }
   }
 
   /**
    * Obtiene el timer activo
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async getActiveTimer() {
+  async getActiveTimer(getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.get(`${this.baseURL}/timer/active`, token);
-      return response;
+      return await apiService.get(`${this.paths.developers}/timer/active`, getToken);
     } catch (error) {
-      console.error('Error al obtener timer activo:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.getActiveTimer error:', error);
+      throw error;
     }
   }
 
+  // ============================================
+  // BUG REPORTS
+  // ============================================
+
   /**
-   * Bug Reports - Obtiene reportes de bugs
+   * Obtiene reportes de bugs
+   * @param {Object} filters - Filtros opcionales
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async getBugReports(filters = {}) {
+  async getBugReports(filters = {}, getToken) {
     try {
-      const token = await this._getTokenFromContext();
       const params = new URLSearchParams();
-      
       Object.entries(filters).forEach(([key, value]) => {
         if (value !== undefined && value !== null && value !== '') {
           params.append(key, value);
         }
       });
-
       const queryString = params.toString();
-      const url = queryString ? `${this.baseURL}/bug-reports?${queryString}` : `${this.baseURL}/bug-reports`;
-      
-      const response = await apiService.get(url, token);
-      return response;
+      const endpoint = queryString 
+        ? `${this.paths.developers}/bug-reports?${queryString}` 
+        : `${this.paths.developers}/bug-reports`;
+      return await apiService.get(endpoint, getToken);
     } catch (error) {
-      console.error('Error al obtener reportes de bugs:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.getBugReports error:', error);
+      throw error;
     }
   }
 
   /**
    * Crea un nuevo reporte de bug
+   * @param {Object} bugData - Datos del bug
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async createBugReport(bugData) {
+  async createBugReport(bugData, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.post(`${this.baseURL}/bug-reports`, bugData, token);
-      return response;
+      return await apiService.post(`${this.paths.developers}/bug-reports`, bugData, getToken);
     } catch (error) {
-      console.error('Error al crear reporte de bug:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.createBugReport error:', error);
+      throw error;
     }
   }
 
   /**
    * Obtiene un bug report específico por ID
+   * @param {string} bugId - ID del bug
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async getBugReportById(bugId) {
+  async getBugReportById(bugId, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.get(`${this.baseURL}/bug-reports/${bugId}`, token);
-      return response;
+      return await apiService.get(`${this.paths.developers}/bug-reports/${bugId}`, getToken);
     } catch (error) {
-      console.error('Error al obtener bug report:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.getBugReportById error:', error);
+      throw error;
     }
   }
 
   /**
    * Actualiza un bug report
+   * @param {string} bugId - ID del bug
+   * @param {Object} updateData - Datos a actualizar
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async updateBugReport(bugId, updateData) {
+  async updateBugReport(bugId, updateData, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.put(`${this.baseURL}/bug-reports/${bugId}`, updateData, token);
-      return response;
+      return await apiService.put(
+        `${this.paths.developers}/bug-reports/${bugId}`,
+        updateData,
+        getToken
+      );
     } catch (error) {
-      console.error('Error al actualizar bug report:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.updateBugReport error:', error);
+      throw error;
     }
   }
 
   /**
    * Cambia el estado de un bug report
+   * @param {string} bugId - ID del bug
+   * @param {string} status - Nuevo estado
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async updateBugStatus(bugId, status) {
+  async updateBugStatus(bugId, status, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.patch(`${this.baseURL}/bug-reports/${bugId}/status`, { status }, token);
-      return response;
+      return await apiService.patch(
+        `${this.paths.developers}/bug-reports/${bugId}/status`,
+        { status },
+        getToken
+      );
     } catch (error) {
-      console.error('Error al cambiar estado del bug:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.updateBugStatus error:', error);
+      throw error;
     }
   }
 
   /**
    * Asigna un bug report a un developer
+   * @param {string} bugId - ID del bug
+   * @param {string} developerId - ID del developer
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async assignBugReport(bugId, developerId) {
+  async assignBugReport(bugId, developerId, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.patch(`${this.baseURL}/bug-reports/${bugId}/assign`, { developerId }, token);
-      return response;
+      return await apiService.patch(
+        `${this.paths.developers}/bug-reports/${bugId}/assign`,
+        { developerId },
+        getToken
+      );
     } catch (error) {
-      console.error('Error al asignar bug report:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.assignBugReport error:', error);
+      throw error;
     }
   }
 
   /**
    * Elimina un bug report
+   * @param {string} bugId - ID del bug
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async deleteBugReport(bugId) {
+  async deleteBugReport(bugId, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.delete(`${this.baseURL}/bug-reports/${bugId}`, token);
-      return response;
+      return await apiService.delete(`${this.paths.developers}/bug-reports/${bugId}`, getToken);
     } catch (error) {
-      console.error('Error al eliminar bug report:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.deleteBugReport error:', error);
+      throw error;
     }
   }
 
   /**
    * Obtiene comentarios de un bug report
+   * @param {string} bugId - ID del bug
+   * @param {number} page - Página
+   * @param {number} limit - Límite por página
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async getBugComments(bugId, page = 1, limit = 20) {
+  async getBugComments(bugId, page = 1, limit = 20, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.get(
-        `${this.baseURL}/bug-reports/${bugId}/comments?page=${page}&limit=${limit}`, 
-        token
+      return await apiService.get(
+        `${this.paths.developers}/bug-reports/${bugId}/comments?page=${page}&limit=${limit}`,
+        getToken
       );
-      return response;
     } catch (error) {
-      console.error('Error al obtener comentarios:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.getBugComments error:', error);
+      throw error;
     }
   }
 
   /**
    * Agrega un comentario a un bug report
+   * @param {string} bugId - ID del bug
+   * @param {string} content - Contenido del comentario
+   * @param {string|null} parentComment - ID del comentario padre (para respuestas)
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async addBugComment(bugId, content, parentComment = null) {
+  async addBugComment(bugId, content, parentComment = null, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.post(
-        `${this.baseURL}/bug-reports/${bugId}/comments`, 
+      return await apiService.post(
+        `${this.paths.developers}/bug-reports/${bugId}/comments`,
         { content, parentComment },
-        token
+        getToken
       );
-      return response;
     } catch (error) {
-      console.error('Error al agregar comentario:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.addBugComment error:', error);
+      throw error;
     }
   }
 
   /**
    * Sube attachments a un bug report
+   * Usa fetch directo porque apiService.post() hace JSON.stringify
+   * que no es compatible con FormData
+   * @param {string} bugId - ID del bug
+   * @param {File[]} files - Archivos a subir
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async uploadBugAttachments(bugId, files) {
+  async uploadBugAttachments(bugId, files, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const formData = new FormData();
+      // Obtener token (getToken puede ser función o string)
+      const token = typeof getToken === 'function' ? await getToken() : getToken;
       
+      const formData = new FormData();
       files.forEach(file => {
         formData.append('attachments', file);
       });
 
-      const response = await apiService.post(
-        `${this.baseURL}/bug-reports/${bugId}/attachments`,
-        formData,
-        token,
-        { 'Content-Type': 'multipart/form-data' }
-      );
-      return response;
+      // Construir URL igual que apiService._executeRequest
+      const endpoint = `${this.paths.developers}/bug-reports/${bugId}/attachments`;
+      let finalEndpoint = endpoint;
+      const baseURL = apiService.baseURL || '';
+      if (!baseURL && !endpoint.startsWith('/api') && !endpoint.startsWith('http')) {
+        finalEndpoint = `/api${endpoint}`;
+      }
+      const url = finalEndpoint.startsWith('http') ? finalEndpoint : `${baseURL}${finalEndpoint}`;
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers: {
+          // NO establecer Content-Type: el browser lo agrega con el boundary automáticamente
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
+        credentials: 'include',
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+
+      return await response.json();
     } catch (error) {
-      console.error('Error al subir attachments:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.uploadBugAttachments error:', error);
+      throw error;
     }
   }
 
+  // ============================================
+  // BACKLOG / ASIGNACIÓN DE TAREAS
+  // ============================================
+
   /**
    * Asigna una tarea del backlog al developer autenticado
+   * Endpoint: POST /developers/backlog/:taskId/take
+   * @param {string} taskId - ID del item de backlog
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async assignBacklogTask(taskId) {
+  async assignBacklogTask(taskId, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.post(
-        `${this.baseURL}/backlog/${taskId}/take`,
+      return await apiService.post(
+        `${this.paths.developers}/backlog/${taskId}/take`,
         {},
-        token
+        getToken
       );
-      return response;
     } catch (error) {
-      console.error('Error al asignar tarea del backlog:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.assignBacklogTask error:', error);
+      throw error;
     }
   }
 
   /**
    * Asigna una tarea regular al developer autenticado
+   * Nota: Usa el mismo endpoint de backlog/take ya que es el único
+   * mecanismo de asignación disponible en el backend
+   * @param {string} taskId - ID de la tarea
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  async assignRegularTask(taskId) {
+  async assignRegularTask(taskId, getToken) {
     try {
-      const token = await this._getTokenFromContext();
-      const response = await apiService.put(
-        `${this.baseURL}/tasks/${taskId}/assign`,
-        { assign_to_me: true },
-        token
+      // Reutiliza el endpoint de backlog/take que es el mecanismo de asignación
+      return await apiService.post(
+        `${this.paths.developers}/backlog/${taskId}/take`,
+        {},
+        getToken
       );
-      return response;
     } catch (error) {
-      console.error('Error al asignar tarea regular:', error);
-      throw this.handleError(error);
+      console.error('DevelopersService.assignRegularTask error:', error);
+      throw error;
+    }
+  }
+
+  // ============================================
+  // PROYECTOS (para vista de proyectos/tareas disponibles)
+  // ============================================
+
+  /**
+   * Obtiene lista de productos/proyectos
+   * @param {Object} filters - Filtros opcionales
+   * @param {Function} getToken - Función para obtener token de autenticación
+   */
+  async getProducts(filters = {}, getToken) {
+    try {
+      const queryParams = new URLSearchParams(filters);
+      const endpoint = queryParams.toString()
+        ? `${this.paths.products}?${queryParams}`
+        : this.paths.products;
+      return await apiService.get(endpoint, getToken);
+    } catch (error) {
+      console.error('DevelopersService.getProducts error:', error);
+      throw error;
     }
   }
 
   /**
-   * Maneja errores de la API de forma consistente
+   * Obtiene items de backlog disponibles (sin asignar)
+   * @param {Object} filters - Filtros opcionales (tipo, producto, prioridad, search, etc.)
+   * @param {Function} getToken - Función para obtener token de autenticación
    */
-  handleError(error) {
-    if (error.response) {
-      // Error de respuesta del servidor
-      const { status, data } = error.response;
-      
-      switch (status) {
-        case 400:
-          return new Error(data.error || 'Datos inválidos');
-        case 401:
-          return new Error('Token de autenticación inválido');
-        case 403:
-          return new Error('Sin permisos para realizar esta acción');
-        case 404:
-          return new Error('Recurso no encontrado');
-        case 500:
-          return new Error('Error interno del servidor');
-        default:
-          return new Error(data.error || 'Error desconocido');
-      }
-    } else if (error.request) {
-      // Error de red
-      return new Error('Error de conexión. Verifica tu conexión a internet.');
-    } else {
-      // Error de configuración
-      return new Error('Error en la configuración de la solicitud');
+  async getAvailableBacklogItems(filters = {}, getToken) {
+    try {
+      const params = new URLSearchParams();
+      Object.entries(filters).forEach(([key, value]) => {
+        if (value !== undefined && value !== null && value !== '') {
+          params.append(key, value);
+        }
+      });
+      const queryString = params.toString();
+      const endpoint = queryString
+        ? `${this.paths.backlog}?${queryString}`
+        : this.paths.backlog;
+      return await apiService.get(endpoint, getToken);
+    } catch (error) {
+      console.error('DevelopersService.getAvailableBacklogItems error:', error);
+      throw error;
     }
   }
 }

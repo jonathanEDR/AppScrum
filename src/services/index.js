@@ -1,8 +1,9 @@
 // Índice de servicios - Exporta todos los servicios de la aplicación
 
-// Importar servicios
+// Importar servicios principales
 import apiService from './apiService.js';
 import scrumMasterService from './scrumMasterService.js';
+import productOwnerService from './productOwnerService.js';
 
 // Importar otros servicios específicos
 let developersApiService = null;
@@ -20,6 +21,7 @@ export const scrumMasterApiService = scrumMasterService;
 export {
   apiService,
   scrumMasterService,
+  productOwnerService,
   developersApiService
 };
 
@@ -28,5 +30,6 @@ export default {
   api: apiService,
   scrumMaster: scrumMasterService,
   scrumMasterApi: scrumMasterService, // Alias
+  productOwner: productOwnerService,
   developers: developersApiService
 };

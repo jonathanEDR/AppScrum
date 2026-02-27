@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useDataCache } from '../context/DataContext';
-import config from '../config/config';
+import { scrumMasterService } from '../services/scrumMasterService';
 
 /**
  * Hook centralizado para datos del Scrum Master con caché inteligente
@@ -86,11 +86,6 @@ export const useScrumMasterData = (autoLoad = true) => {
       setLoading(true);
       setError(null);
 
-      const token = await getToken();
-      if (!token) {
-        throw new Error('No hay token de autenticación');
-      }
-
       // 1. Verificar caché primero (si no es refresh forzado)
       if (!forceRefresh) {
         const cachedData = getCachedData('scrumMaster:dashboard');
@@ -101,32 +96,25 @@ export const useScrumMasterData = (autoLoad = true) => {
         }
       }
 
-      // 2. ✅ Usar endpoint consolidado optimizado
-      const response = await fetch(`${config.API_URL}/scrum-master/dashboard`, {
-        headers: { 
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      // 2. ✅ Usar endpoint consolidado optimizado vía scrumMasterService
+      const dashboardData = await scrumMasterService.getDashboard(getToken);
 
-      if (!response.ok) {
-        // Si el endpoint consolidado no existe aún, usar fallback a múltiples consultas
-        return await loadDataFallback(token);
-      }
-
-      // 3. Procesar respuesta del endpoint consolidado
-      const dashboardData = await response.json();
-
-      // 4. Guardar en caché
+      // 3. Guardar en caché
       setCachedData('scrumMaster:dashboard', dashboardData);
       setData(dashboardData);
 
       return dashboardData;
 
     } catch (err) {
-      console.error('❌ Error loading Scrum Master data:', err);
-      setError(err.message || 'Error al cargar datos del dashboard');
-      return null;
+      // Si el endpoint consolidado falla, usar fallback a múltiples consultas
+      console.warn('Dashboard consolidado no disponible, usando fallback:', err.message);
+      try {
+        return await loadDataFallback();
+      } catch (fallbackErr) {
+        console.error('❌ Error loading Scrum Master data:', fallbackErr);
+        setError(fallbackErr.message || 'Error al cargar datos del dashboard');
+        return null;
+      }
     } finally {
       setLoading(false);
     }
@@ -136,52 +124,34 @@ export const useScrumMasterData = (autoLoad = true) => {
    * Función fallback para cargar datos con múltiples consultas
    * Se usa si el endpoint consolidado no está disponible aún
    */
-  const loadDataFallback = useCallback(async (token) => {
+  const loadDataFallback = useCallback(async () => {
     try {
       const [
-        sprintsResponse,
-        backlogResponse,
-        technicalItemsResponse,
-        teamMembersResponse,
-        productsResponse
+        sprintsData,
+        backlogData,
+        technicalData,
+        teamData,
+        productsData
       ] = await Promise.all([
-        fetch(`${config.API_URL}/sprints?limit=10`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`${config.API_URL}/backlog?tipo=historia&limit=50`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`${config.API_URL}/backlog?tipo=tarea,bug,mejora&limit=100`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`${config.API_URL}/team/members`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        }),
-        fetch(`${config.API_URL}/products`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        })
+        scrumMasterService.getSprints({ limit: 10 }, getToken).catch(() => ({ sprints: [] })),
+        scrumMasterService.getBacklogItems({ tipo: 'historia', limit: 50 }, getToken).catch(() => ({ items: [] })),
+        scrumMasterService.getBacklogItems({ tipo: 'tarea,bug,mejora', limit: 100 }, getToken).catch(() => ({ items: [] })),
+        scrumMasterService.getTeamMembers({}, getToken).catch(() => ({ members: [] })),
+        scrumMasterService.getProducts(getToken).catch(() => ({ products: [] }))
       ]);
 
       // Procesar respuestas
-      const sprints = sprintsResponse.ok ? (await sprintsResponse.json())?.sprints || [] : [];
-      const backlogData = backlogResponse.ok ? await backlogResponse.json() : { items: [] };
-      const technicalData = technicalItemsResponse.ok ? await technicalItemsResponse.json() : { items: [] };
-      const teamData = teamMembersResponse.ok ? await teamMembersResponse.json() : { members: [] };
-      const productsData = productsResponse.ok ? await productsResponse.json() : { products: [] };
-
+      const sprints = sprintsData?.sprints || [];
       const activeSprint = sprints.find(s => s.estado === 'activo') || sprints[0] || null;
 
       let activeSprintItems = [];
       if (activeSprint?._id) {
         try {
-          const sprintItemsResponse = await fetch(
-            `${config.API_URL}/backlog?sprint=${activeSprint._id}`,
-            { headers: { 'Authorization': `Bearer ${token}` } }
+          const sprintItemsData = await scrumMasterService.getBacklogItems(
+            { sprint: activeSprint._id },
+            getToken
           );
-          if (sprintItemsResponse.ok) {
-            const sprintItemsData = await sprintItemsResponse.json();
-            activeSprintItems = sprintItemsData.items || [];
-          }
+          activeSprintItems = sprintItemsData.items || [];
         } catch (err) {
           console.warn('Error fetching active sprint items:', err);
         }

@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useMemo } from 'react';
+import { useState, useCallback, useMemo } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-react';
 import { developersApiService } from '../services/developersApiService';
@@ -50,11 +50,6 @@ export const useSprintBoard = (initialSprintId = null, initialFilterMode = 'all'
   const [selectedSprintId, setSelectedSprintId] = useState(initialSprintId);
   const [filterMode, setFilterMode] = useState(initialFilterMode); // 'all' o 'sprint'
 
-  // Configurar el token provider en el servicio
-  useEffect(() => {
-    developersApiService.setTokenProvider(getToken);
-  }, [getToken]);
-
   // Query para obtener datos del sprint board
   const {
     data: sprintData,
@@ -65,7 +60,7 @@ export const useSprintBoard = (initialSprintId = null, initialFilterMode = 'all'
   } = useQuery({
     queryKey: ['developer-sprint-board', selectedSprintId, filterMode],
     queryFn: async () => {
-      const response = await developersApiService.getSprintBoardData(selectedSprintId, filterMode);
+      const response = await developersApiService.getSprintBoardData(selectedSprintId, filterMode, getToken);
       if (!response.success) {
         throw new Error('Error al cargar datos del sprint board');
       }
@@ -110,7 +105,7 @@ export const useSprintBoard = (initialSprintId = null, initialFilterMode = 'all'
       const normalizedStatus = normalizeStatusForBackend(newStatus);
       console.log('📤 [DRAG & DROP] Enviando al backend:', { taskId, normalizedStatus });
       
-      const response = await developersApiService.updateTaskStatus(taskId, normalizedStatus);
+      const response = await developersApiService.updateTaskStatus(taskId, normalizedStatus, getToken);
       console.log('📥 [DRAG & DROP] Respuesta del backend:', response);
       
       if (!response.success) {

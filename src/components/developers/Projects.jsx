@@ -19,6 +19,7 @@ import {
 import AssignTaskModal from './AssignTaskModal';
 import ProjectFilters from './ProjectFilters';
 import { useTheme } from '../../context/ThemeContext';
+import { developersApiService } from '../../services/developersApiService';
 
 const Projects = () => {
   const { getToken } = useAuth();
@@ -77,20 +78,8 @@ const Projects = () => {
 
   const loadProjects = async () => {
     try {
-      const token = await getToken();
-      const API_URL = import.meta.env.VITE_API_URL;
-      
-      const response = await fetch(`${API_URL}/products`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setProjects(data.products || data || []);
-      }
+      const response = await developersApiService.getProducts({}, getToken);
+      setProjects(response.products || response.data || response || []);
     } catch (error) {
       console.error('Error loading projects:', error);
     }
@@ -98,49 +87,35 @@ const Projects = () => {
 
   const loadAvailableTasks = async () => {
     try {
-      const token = await getToken();
-      const API_URL = import.meta.env.VITE_API_URL;
+      // Construir filtros para el servicio
+      const queryFilters = {
+        tipo: 'tarea,bug,mejora',
+        available_only: 'true'
+      };
       
-      // Construir query parameters
-      const params = new URLSearchParams();
+      if (filters.project !== 'all') queryFilters.producto = filters.project;
+      if (filters.type !== 'all') queryFilters.tipo = filters.type;
+      if (filters.priority !== 'all') queryFilters.prioridad = filters.priority;
+      if (filters.search) queryFilters.search = filters.search;
       
-      // Solo tareas técnicas (excluir historias)
-      params.append('tipo', 'tarea,bug,mejora');
-      
-      // Solo tareas disponibles (no asignadas)
-      params.append('available_only', 'true');
-      
-      if (filters.project !== 'all') params.append('producto', filters.project);
-      if (filters.type !== 'all') params.append('tipo', filters.type);
-      if (filters.priority !== 'all') params.append('prioridad', filters.priority);
-      if (filters.search) params.append('search', filters.search);
-      
-      const response = await fetch(`${API_URL}/backlog?${params.toString()}`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        }
-      });
+      const data = await developersApiService.getAvailableBacklogItems(queryFilters, getToken);
 
-      if (response.ok) {
-        const data = await response.json();
-        // Filtrar solo items DISPONIBLES (sin asignar) y que sean tareas técnicas
-        const available = (data.items || []).filter(item => {
-          // 1. Debe ser una tarea técnica (no historia)
-          const isTechnicalTask = ['tarea', 'bug', 'mejora'].includes(item.tipo);
-          
-          // 2. NO debe estar asignada a nadie
-          const isUnassigned = !item.asignado_a;
-          
-          // 3. Debe estar en estado pendiente o sin estado
-          const isPending = item.estado === 'pendiente' || !item.estado;
-          
-          return isTechnicalTask && isUnassigned && isPending;
-        });
+      // Filtrar solo items DISPONIBLES (sin asignar) y que sean tareas técnicas
+      const available = (data.items || []).filter(item => {
+        // 1. Debe ser una tarea técnica (no historia)
+        const isTechnicalTask = ['tarea', 'bug', 'mejora'].includes(item.tipo);
         
-        setAvailableTasks(available);
-        console.log('Tareas técnicas disponibles (sin asignar) cargadas:', available.length);
-      }
+        // 2. NO debe estar asignada a nadie
+        const isUnassigned = !item.asignado_a;
+        
+        // 3. Debe estar en estado pendiente o sin estado
+        const isPending = item.estado === 'pendiente' || !item.estado;
+        
+        return isTechnicalTask && isUnassigned && isPending;
+      });
+      
+      setAvailableTasks(available);
+      console.log('Tareas técnicas disponibles (sin asignar) cargadas:', available.length);
     } catch (error) {
       console.error('Error loading available tasks:', error);
     }

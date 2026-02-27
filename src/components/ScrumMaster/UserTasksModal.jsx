@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@clerk/clerk-react';
 import { useTheme } from '../../context/ThemeContext';
-import { userTasksService } from '../../services/userTasksService';
+import { scrumMasterService } from '../../services/scrumMasterService';
 import {
   X,
   CheckCircle,
@@ -37,14 +37,19 @@ const UserTasksModal = ({ isOpen, onClose, user, teamMemberId }) => {
 
       // Usar el ID del TeamMember si está disponible, sino el ID del usuario
       const userId = teamMemberId || user._id;
-      const result = await userTasksService.getUserTasks(userId, token);
+      const result = await scrumMasterService.getUserTasks(userId, getToken);
 
-      if (result.success) {
-        setTasks(result.data);
-        setStats(result.stats);
-      } else {
-        setError(result.error);
-      }
+      // Adaptar respuesta: getUserTasks retorna { tasks, total, completed, inProgress, pending }
+      const tasksData = result.tasks || result.data || [];
+      const statsData = result.stats || {
+        total: result.total || tasksData.length,
+        completed: result.completed || 0,
+        inProgress: result.inProgress || 0,
+        pending: result.pending || 0
+      };
+      
+      setTasks(tasksData);
+      setStats(statsData);
     } catch (error) {
       console.error('Error fetching user tasks:', error);
       setError('Error al cargar las tareas del usuario');

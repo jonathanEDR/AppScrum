@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useCallback } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@clerk/clerk-react';
 import { developersApiService } from '../services/developersApiService';
@@ -17,11 +17,6 @@ export const useDeveloperTasks = (initialFilters = {}) => {
   const queryClient = useQueryClient();
   const [filters, setFilters] = useState(initialFilters);
 
-  // Configurar el token provider en el servicio
-  useEffect(() => {
-    developersApiService.setTokenProvider(getToken);
-  }, [getToken]);
-
   // Query para obtener tareas con React Query
   const {
     data,
@@ -32,7 +27,7 @@ export const useDeveloperTasks = (initialFilters = {}) => {
   } = useQuery({
     queryKey: ['developer-tasks', filters],
     queryFn: async () => {
-      const response = await developersApiService.getTasks(filters);
+      const response = await developersApiService.getTasks(filters, getToken);
       if (!response.success) {
         throw new Error('Error al cargar tareas');
       }
@@ -51,7 +46,7 @@ export const useDeveloperTasks = (initialFilters = {}) => {
   // Mutation para actualizar estado de tarea
   const updateTaskMutation = useMutation({
     mutationFn: async ({ taskId, newStatus }) => {
-      const response = await developersApiService.updateTaskStatus(taskId, newStatus);
+      const response = await developersApiService.updateTaskStatus(taskId, newStatus, getToken);
       if (!response.success) {
         throw new Error('Error al actualizar tarea');
       }

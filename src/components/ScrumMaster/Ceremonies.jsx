@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import CeremonyModal from './modalScrumMaster/modalCeremonies';
 import { useAuth } from '@clerk/clerk-react';
-import apiService from '../../services/apiService';
+import { scrumMasterService } from '../../services/scrumMasterService';
 import { useTheme } from '../../context/ThemeContext';
 import { 
   Calendar, 
@@ -196,7 +196,7 @@ const Ceremonies = () => {
     try {
       setLoading(true);
       setError(null);
-      const response = await apiService.getCeremonies(getToken);
+      const response = await scrumMasterService.getCeremonies({}, getToken);
       
       // El backend retorna { ceremonies: [...], total: X }
       const ceremoniesData = response.ceremonies || response || [];
@@ -230,7 +230,7 @@ const Ceremonies = () => {
     const fetchTeamMembers = async () => {
       try {
         // Usar el método con fallback que incluye autenticación
-        const data = await apiService.getTeamMembersWithFallback(getToken);
+        const data = await scrumMasterService.getTeamMembersWithFallback(getToken);
         
         // Mapear datos al formato esperado
         const names = (data.members || data || []).map(member => {
@@ -272,7 +272,7 @@ const Ceremonies = () => {
 
   const handleStartCeremony = async (ceremony) => {
     try {
-      await apiService.updateCeremony(
+      await scrumMasterService.updateCeremony(
         ceremony.id,
         { status: 'in_progress' },
         getToken
@@ -291,7 +291,7 @@ const Ceremonies = () => {
 
   const handleCompleteCeremony = async (ceremony) => {
     try {
-      await apiService.updateCeremony(
+      await scrumMasterService.updateCeremony(
         ceremony.id,
         { status: 'completed' },
         getToken
@@ -326,7 +326,7 @@ const Ceremonies = () => {
 
       if (editingCeremony) {
         // Editar ceremonia existente
-        const updatedCeremony = await apiService.updateCeremony(
+        const updatedCeremony = await scrumMasterService.updateCeremony(
           editingCeremony.id, 
           apiData, 
           getToken
@@ -340,7 +340,7 @@ const Ceremonies = () => {
       } else {
         // Crear nueva ceremonia
         try {
-          const newCeremony = await apiService.createCeremony(apiData, getToken);
+          const newCeremony = await scrumMasterService.createCeremony(apiData, getToken);
           
           // Recargar todas las ceremonias para obtener el formato correcto del backend
           await loadCeremonies();
